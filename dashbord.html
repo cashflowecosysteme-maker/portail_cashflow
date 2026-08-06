@@ -161,7 +161,7 @@
       <div class="welcome-text">Bienvenue sur le Portail CashFlow ✦ <strong id="header-username"></strong></div>
     </div>
     <div class="header-actions">
-      <span class="btn-header btn-pro">⭐ PORTAIL GARDIENNE</span>
+      <span class="btn-header btn-pro">⭐ Portail CashFlow</span>
       <button class="btn-header btn-logout" onclick="logout()">Déconnexion</button>
     </div>
   </header>
@@ -201,10 +201,10 @@
       <div class="sidebar-section">
         <div class="sidebar-label">Mon Parcours</div>
         <div class="nav-item" id="nav-miroir" onclick="showPanel('miroir')">
-          <span class="nav-icon">🪞</span> Mon Espace Gardienne <span class="nav-arrow">›</span>
+          <span class="nav-icon">🪞</span> Mon Espace CashFlow <span class="nav-arrow">›</span>
         </div>
         <div class="nav-item" id="nav-journal" onclick="showPanel('journal')">
-          <span class="nav-icon">📖</span> Journal Gardienne <span class="nav-arrow">›</span>
+          <span class="nav-icon">📖</span> Journal CashFlow <span class="nav-arrow">›</span>
         </div>
         <div class="nav-item" id="nav-messages" onclick="showPanel('messages'); loadMessages()">
           <span class="nav-icon">💌</span> Messages du Cercle <span class="nav-arrow">›</span> <span id="unread-badge" style="display:none;background:#ff4b6e;color:#fff;border-radius:50px;font-size:10px;font-weight:700;padding:2px 7px;margin-left:4px"></span>
@@ -232,7 +232,7 @@
           <div class="user-avatar" id="sidebar-avatar">D</div>
           <div class="user-info">
             <div class="user-name" id="sidebar-username">Chargement...</div>
-            <div class="user-plan">✦ Portail Gardienne</div>
+            <div class="user-plan">✦ Portail CashFlow</div>
           </div>
         </div>
       </div>
@@ -278,16 +278,16 @@
         </div>
       </div>
 
-      <!-- Panel Mon Espace Gardienne -->
+      <!-- Panel Mon Espace CashFlow -->
       <div class="panel" id="panel-miroir" style="flex-direction:column;padding:24px;overflow-y:auto">
         <div style="max-width:700px;margin:0 auto;width:100%;text-align:center;padding-top:60px">
           <div style="font-size:48px;margin-bottom:16px">🪞</div>
-          <h2 style="font-family:'Space Grotesk',sans-serif;font-size:22px;margin-bottom:8px">Mon Espace Gardienne</h2>
+          <h2 style="font-family:'Space Grotesk',sans-serif;font-size:22px;margin-bottom:8px">Mon Espace CashFlow</h2>
           <p style="color:var(--t3);font-size:13px;line-height:1.7">Bientôt ici : le Grimoire des Liens — tes deux alliées du Cercle, leurs jauges d'énergie, et tes notes de cœur en temps réel. En construction. ✦</p>
         </div>
       </div>
 
-      <!-- Panel Journal de la gardienne — iframe -->
+      <!-- Panel Journal de la cashflow — iframe -->
       <div class="panel" id="panel-journal" style="flex-direction:column">
         <div style="flex:1;overflow:hidden;position:relative">
           <iframe src="/journal-gardienne.html" style="width:100%;height:100%;border:none;display:block" title="Journal de la Gardienne"></iframe>
