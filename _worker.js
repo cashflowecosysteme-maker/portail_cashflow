@@ -199,6 +199,7 @@ export default {
 
       // ── Ingestion des livres Markdown dans Vectorize (Sécurisé Admin) ──
       if (path === '/api/ingest-book' && request.method === 'POST') return await handleIngestBook(request, env);
+      if (path === '/api/admin/clear-brain' && request.method === 'POST') return await handleClearBrain(request, env);
       if (path === '/api/admin/setup-vectorize' && request.method === 'POST') return await handleSetupVectorize(request, env);
 
       if (path === '/api/admin/login' && request.method === 'POST') return await handleAdminLogin(request, env);
@@ -887,6 +888,28 @@ async function handleSetupVectorize(request, env) {
 }
 
 // Route pour envoyer tes textes Markdown vers la base de données vectorielle
+// Vide un cerveau (namespace) : supprime tous ses vecteurs via les IDs suivis en KV.
+async function handleClearBrain(request, env) {
+  if (!await requireAdmin(request, env)) return json({ error: 'Non autorisé.' }, 401);
+  const { personnage } = await request.json();
+  if (!personnage) return json({ error: 'personnage requis.' }, 400);
+  const prefix = 'brain_id:' + personnage + ':';
+  const ids = [], kvKeys = [];
+  let cursor;
+  do {
+    const list = await env.CASHFLOW_KV.list({ prefix, cursor });
+    for (const k of list.keys) { kvKeys.push(k.name); ids.push(k.name.slice(prefix.length)); }
+    cursor = list.list_complete ? null : list.cursor;
+  } while (cursor);
+  let deleted = 0;
+  for (let i = 0; i < ids.length; i += 500) {
+    const batch = ids.slice(i, i + 500);
+    try { await env.VECTORIZE_INDEX.deleteByIds(batch); deleted += batch.length; } catch (e) {}
+  }
+  for (const key of kvKeys) { try { await env.CASHFLOW_KV.delete(key); } catch (e) {} }
+  return json({ success: true, deleted, message: `Cerveau « ${personnage} » vidé (${deleted} passages).` });
+}
+
 async function handleIngestBook(request, env) {
   // Sécurité : seul un admin avec le bon token peut ingérer
   if (!await requireAdmin(request, env)) return json({ error: 'Non autorisé.' }, 401);
@@ -908,6 +931,8 @@ async function handleIngestBook(request, env) {
       cible: personnage // "eric", "nyxia", ou "global"
     }
   }]);
+
+  await env.CASHFLOW_KV.put('brain_id:' + personnage + ':' + id, '1');
 
   return json({ success: true, message: `Passage ${id} ingéré pour ${personnage}.` });
 }
