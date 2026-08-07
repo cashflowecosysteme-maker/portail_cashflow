@@ -1,4 +1,4 @@
-name = "gardienne"
+name = "cashflow"
 main = "_worker.js"
 compatibility_date = "2026-07-01"
 compatibility_flags = ["nodejs_compat"]
