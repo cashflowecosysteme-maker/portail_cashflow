@@ -371,6 +371,18 @@ tr:hover td{background:rgba(123,92,255,0.05)}
       <div id="msg-admin-status" style="margin-top:10px;font-size:13px"></div>
     </div>
 
+    <!-- Setup Vectorize (cerveaux Éric & NyXia) -->
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">🧠 Cerveaux vectoriels (Vectorize)</div>
+          <div class="panel-subtitle">À faire UNE fois, sans terminal. Ajoute d'abord les variables <b>CF_API_TOKEN</b> et <b>CF_ACCOUNT_ID</b> sur ton Worker, puis clique.</div>
+        </div>
+        <button class="btn-primary" onclick="setupVectorize(this)">⚙️ Créer l'index Vectorize</button>
+      </div>
+      <div id="vectorize-status" style="font-size:13px;color:var(--t3);margin-top:6px"></div>
+    </div>
+
     <!-- Accounts List -->
     <div class="panel">
       <div class="panel-header">
@@ -705,6 +717,28 @@ document.getElementById('adminPassword').addEventListener('keydown', function(e)
    ═══════════════════════════════════════════════ */
 
 var accounts = [];
+
+async function setupVectorize(btn) {
+  var statusEl = document.getElementById('vectorize-status');
+  if (!confirm("Créer l'index Vectorize « univers-livres » (1024, cosine) ? À ne faire qu'une seule fois.")) return;
+  btn.disabled = true; var old = btn.textContent; btn.textContent = 'Création…';
+  statusEl.style.color = 'var(--t3)'; statusEl.textContent = 'Appel à Cloudflare…';
+  try {
+    var res = await apiCall('/api/admin/setup-vectorize', { method: 'POST', body: '{}' });
+    if (res.success) {
+      statusEl.style.color = 'var(--green)';
+      statusEl.textContent = res.message;
+    } else {
+      var extra = (res.error && res.error.toLowerCase().indexOf('already') > -1) ? " — l'index existe déjà, tu peux passer à l'étape suivante." : '';
+      statusEl.style.color = 'var(--red)';
+      statusEl.textContent = '⚠️ ' + (res.error || 'Erreur') + extra;
+    }
+  } catch (e) {
+    statusEl.style.color = 'var(--red)';
+    statusEl.textContent = '⚠️ ' + (e.message || 'Erreur réseau');
+  }
+  btn.disabled = false; btn.textContent = old;
+}
 
 async function apiCall(endpoint, options) {
   if (!requireAdminSession()) throw new Error('Session expirée');
