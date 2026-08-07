@@ -1,4 +1,4 @@
-name = "cashflow"
+name = "portail-cashflow"
 main = "_worker.js"
 compatibility_date = "2026-07-01"
 compatibility_flags = ["nodejs_compat"]
@@ -8,5 +8,5 @@ directory = "."
 binding = "ASSETS"
 
 [[kv_namespaces]]
-binding = "GARDIENNE_KV"
+binding = "CASHFLOW_KV"
 id = "106db6da016d49d2b480452f19bad695"
