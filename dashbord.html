@@ -171,24 +171,12 @@
     <aside>
       <!-- SECTION : MON ESPACE -->
       <div class="sidebar-section">
-        <div class="sidebar-label">Mon Espace</div>
-        <div class="nav-item" id="nav-chat" onclick="openAgentTab('nyxia')">
-          <span class="nav-icon">💜</span> Mes Conversations <span class="nav-arrow">›</span>
+        <div class="sidebar-label">Mes Conversations</div>
+        <div class="nav-item" id="nav-diane" onclick="openAgentTab('diane')">
+          <span class="nav-icon">👑</span> Diane <span class="nav-arrow">›</span>
         </div>
         <div class="nav-item active" id="nav-nyxia" onclick="openAgentTab('nyxia')">
           <span class="nav-icon">✦</span> NyXia <span class="nav-arrow">›</span>
-        </div>
-        <div class="nav-item" id="nav-selena" onclick="openAgentTab('selena')">
-          <span class="nav-icon">🌿</span> Séléna <span class="nav-arrow">›</span>
-        </div>
-        <div class="nav-item" id="nav-kael" onclick="openAgentTab('kael')">
-          <span class="nav-icon">💔</span> Kael <span class="nav-arrow">›</span>
-        </div>
-        <div class="nav-item" id="nav-lena" onclick="openAgentTab('lena')">
-          <span class="nav-icon">🔮</span> Léna <span class="nav-arrow">›</span>
-        </div>
-        <div class="nav-item" id="nav-alex" onclick="openAgentTab('alex')">
-          <span class="nav-icon">✍️</span> Alex <span class="nav-arrow">›</span>
         </div>
         <div class="nav-item" id="nav-eric" onclick="openAgentTab('eric')">
           <span class="nav-icon">🔥</span> Éric <span class="nav-arrow">›</span>
@@ -250,10 +238,7 @@
             <button class="btn-speak" id="btn-speak" onclick="jouerMessageDiane()">🔊 Message d'accueil</button>
           </div>
           <div class="chat-messages active-chat" id="chat-messages-nyxia"></div>
-          <div class="chat-messages" id="chat-messages-selena"></div>
-          <div class="chat-messages" id="chat-messages-kael"></div>
-          <div class="chat-messages" id="chat-messages-lena"></div>
-          <div class="chat-messages" id="chat-messages-alex"></div>
+          <div class="chat-messages" id="chat-messages-diane"></div>
           <div class="chat-messages" id="chat-messages-eric"></div>
           <div class="suggestions" id="suggestions"></div>
           <div id="attach-bar" style="display:none;padding:6px 20px;background:rgba(123,92,255,0.08);border-top:1px solid rgba(123,92,255,0.1);align-items:center;gap:8px;flex-shrink:0;font-size:12px;color:var(--t3)">
@@ -346,40 +331,13 @@
       </div>
 
       <!-- Panel Livres Audio -->
-      <div class="panel" id="panel-audiobooks" style="flex-direction:column;padding:24px;overflow-y:auto">
-        <div style="max-width:700px;margin:0 auto;width:100%">
-          <h2 style="font-family:'Space Grotesk',sans-serif;font-size:22px;margin-bottom:4px">🎧 Livres Audio</h2>
-          <p style="color:var(--t3);font-size:13px;margin-bottom:24px">Tes deux compagnons d'écoute pour nourrir ta pratique et calmer ton système.</p>
-
-          <div style="display:flex;flex-direction:column;gap:14px">
-            <div style="background:rgba(123,92,255,0.05);border:1px solid rgba(123,92,255,0.12);border-radius:14px;padding:20px;display:flex;align-items:center;gap:16px">
-              <div style="font-size:32px">🔊</div>
-              <div style="flex:1">
-                <div style="font-weight:600;font-size:14px;margin-bottom:2px">La Psychologie du Clic</div>
-                <div style="font-size:12px;color:var(--t3)">Bientôt disponible ici en version audio.</div>
-              </div>
-            </div>
-            <div style="background:rgba(123,92,255,0.05);border:1px solid rgba(123,92,255,0.12);border-radius:14px;padding:20px;display:flex;align-items:center;gap:16px">
-              <div style="font-size:32px">🔊</div>
-              <div style="flex:1">
-                <div style="font-weight:600;font-size:14px;margin-bottom:2px">CashFlow Neurogénéré — Calme ton système nerveux, libère ta richesse</div>
-                <div style="font-size:12px;color:var(--t3)">Bientôt disponible ici en version audio.</div>
-              </div>
-            </div>
-          </div>
-        </div>
+      <div class="panel" id="panel-audiobooks" style="flex-direction:column">
+        <iframe src="/livres.html" style="width:100%;height:100%;border:none;display:block" title="Livres de la formation"></iframe>
       </div>
 
-      <!-- Panel Templates & Ressources -->
-      <div class="panel" id="panel-templates" style="flex-direction:column;padding:24px;overflow-y:auto">
-        <div style="max-width:700px;margin:0 auto;width:100%">
-          <h2 style="font-family:'Space Grotesk',sans-serif;font-size:22px;margin-bottom:4px">🎨 Templates & Ressources</h2>
-          <p style="color:var(--t3);font-size:13px;margin-bottom:24px">Des gabarits prêts à personnaliser pour habiller tes publications dans le Cercle.</p>
-
-          <div style="text-align:center;padding-top:40px;color:var(--t3);font-size:13px">
-            Bientôt ici : tes templates Canva et ressources prêtes à l'emploi. ✦
-          </div>
-        </div>
+      <!-- Templates & Ressources — page séparée éditable -->
+      <div class="panel" id="panel-templates" style="flex-direction:column">
+        <iframe src="/templates.html" style="width:100%;height:100%;border:none;display:block" title="Templates & Ressources"></iframe>
       </div>
 
     </div>
@@ -392,13 +350,10 @@
     // NyXia garde exactement sa voix d'origine — inchangée, cohérente avec tous les autres portails.
     var VOICE_PRIORITY = {
       nyxia:  ['Microsoft Denise','Microsoft Hortense','Google français','Amélie','Audrey','Virginie','Sophie','Marie','Alice'],
-      selena: ['Audrey','Virginie','Microsoft Hortense','Sophie','Marie','Alice','Amélie','Microsoft Denise','Google français'],
-      lena:   ['Marie','Alice','Sophie','Amélie','Audrey','Virginie','Microsoft Hortense','Microsoft Denise','Google français'],
-      kael:   ['Microsoft Paul','Thomas','Nicolas','Daniel','Bruno','Guillaume','Microsoft Henri'],
-      alex:   ['Guillaume','Daniel','Thomas','Nicolas','Bruno','Microsoft Paul','Microsoft Henri'],
+      diane:  ['Audrey','Virginie','Microsoft Hortense','Sophie','Marie','Alice','Amélie','Microsoft Denise','Google français'],
       eric:   ['Nicolas','Bruno','Guillaume','Microsoft Paul','Daniel','Thomas','Microsoft Henri']
     }
-    var AGENT_VOICE_GENDER = { nyxia: 'feminine', selena: 'feminine', lena: 'feminine', kael: 'masculine', alex: 'masculine', eric: 'masculine' }
+    var AGENT_VOICE_GENDER = { nyxia: 'feminine', diane: 'feminine', eric: 'masculine' }
     var _cachedVoices = null;
     function pickBestFrenchVoice(voices, agentKey) {
       if (!voices || !voices.length) voices = window.speechSynthesis.getVoices()
@@ -410,7 +365,7 @@
       }
       // Repli sur l'autre genre si aucune voix propre à ce personnage n'existe sur cet appareil
       var gender = AGENT_VOICE_GENDER[agentKey] || 'feminine'
-      var fallbackList = gender === 'masculine' ? VOICE_PRIORITY.nyxia : VOICE_PRIORITY.kael
+      var fallbackList = gender === 'masculine' ? VOICE_PRIORITY.eric : VOICE_PRIORITY.nyxia
       for (var j = 0; j < fallbackList.length; j++) {
         var found2 = voices.find(function(v) { return v.name.indexOf(fallbackList[j]) !== -1 && v.lang.indexOf('fr') === 0 })
         if (found2) { _cachedVoices = found2; console.log('🔊 Voix repli (' + agentKey + '):', found2.name); return found2 }
@@ -638,7 +593,7 @@
     })
 
     /* ═══════ CHAT ═══════ */
-    var chatHistories = { nyxia: [], selena: [], kael: [], lena: [], alex: [], eric: [] }
+    var chatHistories = { nyxia: [], diane: [], eric: [] }
     var _nyxiaVoiceAuto = false
     var _micRecognition = null, _micListening = false
 
@@ -710,32 +665,23 @@
 
     function sendWelcome() {
       var name = clientName || 'Membre'
-      var welcome = '« Bienvenue dans ton sanctuaire ✦\n\n' +
-        'Allô ' + name + ' 💜\n\n' +
-        'Le Cercle t\'attendait. Tu n\'es pas ici par hasard : tu as été choisie pour être le phare de ceux qui errent dans le noir, et ton espace de travail te renvoie enfin le reflet de ton importance. Tu n\'as plus à crier dans le vide sur les réseaux sociaux ou à harceler tes proches.\n\n' +
-        'Regarde dans mon miroir : je t\'ouvre les portes de mon [Cercle Magique l\'Âme Agit](https://www.facebook.com/groups/cerclemagique) de 40 000 âmes endormies qui n\'attendent que ta lumière pour se réveiller.\n\n' +
-        'Aujourd\'hui, j\'ai forgé tes armes de lumière. Quel Guide de la Ligue des Alphas choisit ton âme pour aller semer ta fréquence, activer ta lignée et dupliquer ton abondance en profondeur ? »'
+      var welcome = '✦ Allô ' + name + ' 💜\n\n' +
+        'Tu n\'es pas ici par hasard. Bienvenue dans ton espace CashFlow — ton sanctuaire de travail.\n\n' +
+        'Tu n\'as plus à crier dans le vide ni à déranger tes proches. Je t\'ouvre les portes de nos trois grands Cercles, 88 000 personnes réunies : Les Entrepreneurs du Québec, CashFlow™, et le [Cercle Magique « L\'âme-agit »](https://www.facebook.com/groups/cerclemagique). C\'est là que tu vas tisser des liens vrais.\n\n' +
+        'Dis-moi — as-tu envie qu\'Éric te forme et te donne de quoi publier aujourd\'hui, ou veux-tu d\'abord entendre la vision de Diane ? ✦'
       addBotMessage(welcome)
       addAlphaChoiceButtons()
     }
 
     var ALPHA_INFO = {
-      selena: { name: 'Séléna', icon: '🔮', sub: 'Gardienne du Portail du Miroir Amis', greeting: '🪞 Le miroir s\'ouvre... Je suis **Séléna**. Aujourd\'hui, je vais te remettre un parchemin à déposer dans le Cercle Magique l\'Âme Agit — un texte qui va faire réagir celles qui portent un masque sans le savoir. Prête à aller semer ta lumière ? ✦' },
-      kael:   { name: 'Kael',   icon: '❤️', sub: 'Gardien du Portail Relation', greeting: '💔 Prête à créer de nouvelles relations ? Je peux te remettre un parchemin prêt à être publié sur le groupe [Le Cercle Magique l\'Âme Agit](https://www.facebook.com/groups/cerclemagique). Il te suffit de me dire "donne-moi un parchemin" et il apparaîtra ici, dans le chat ! 🔥' },
-      lena:   { name: 'Léna',   icon: '🌙', sub: 'Gardienne du Portail Vibratoire et Spirituel', greeting: '🌙 Les fréquences bougent... Je suis **Léna**. Le Cercle a besoin d\'un électrochoc aujourd\'hui — un déclencheur mystique pour réveiller les sorcières endormies. Je vais t\'en donner un à publier. Prête ? 🔮' },
-      alex:   { name: 'Alex',   icon: '✍️', sub: 'Gardien du Portail Devenir Auteur', greeting: '✍️ Je suis **Alex**. Le Cercle est plein de gens qui portent en silence le rêve d\'écrire un livre, sans jamais oser commencer — connais-tu quelqu\'un comme ça ? Laisse-moi te donner un parchemin pour réveiller ce rêve chez elle. 📖' },
-      eric:   { name: 'Éric',   icon: '🔥', sub: 'Gardien du Portail CashFlow', greeting: '🔥 Eh bien, eh bien... regarde qui vient me voir. Je suis **Éric**, et honnêtement ? Le Cercle a de la chance de t\'avoir. Raconte-moi ta journée, Gardienne. 👑😉' }
+      diane: { name: 'Diane',  icon: '👑', sub: 'La créatrice — présente en clone IA', greeting: '💜 Ah, te voilà. Je suis **Diane** — enfin, ma présence sous forme de clone IA, pour être là avec toi pendant ta formation. Dis-moi ce qui t\'habite aujourd\'hui : l\'envie de comprendre le *pourquoi* derrière tout ça, ou simplement besoin d\'un peu d\'élan ? ✨' },
+      eric:   { name: 'Éric',   icon: '🔥', sub: 'Gardien-formateur du Portail CashFlow', greeting: '🔥 Eh bien, eh bien... regarde qui vient me voir. Je suis **Éric**, ton formateur. Tu veux que je te forme sur la communication à l\'ère numérique, ou que je te donne un parchemin prêt à publier ? Dis-moi simplement « donne-moi un parchemin » et il apparaîtra ici. 👑😉' }
     }
-
     var AGENT_IMAGES = {
-      nyxia:  '/NyXia.png',
-      selena: '/Selena.png',
-      kael:   '/Kael.png',
-      lena:   '/Lena.png',
-      alex:   '/Alex.png',
-      eric:   '/Eric.png'
+      nyxia: '/NyXia.png',
+      diane: '/Diane.png',
+      eric:  '/Eric.png'
     }
-
     function avatarHtmlFor(key, sizeClass) {
       sizeClass = sizeClass || 'msg-avatar'
       var src = AGENT_IMAGES[key] || AGENT_IMAGES.nyxia
@@ -1073,8 +1019,8 @@
       speakViaHeyGen(btn, text, _currentAgent)
     }
 
-    // Essaie la voix HeyGen du personnage actif ; si aucune n'est configurée pour lui,
-    // retombe automatiquement sur la synthèse vocale gratuite du navigateur.
+    // Voix serveur du personnage actif via le Worker : NyXia + Diane = ElevenLabs, Éric = OpenAI (echo).
+    // Aucun repli navigateur pour préserver l'identité sonore de la marque (règle NyXia).
     function speakViaHeyGen(btn, text, agentKey) {
       var clean = cleanForSpeech(text)
       if (!clean) return
@@ -1090,7 +1036,7 @@
         audio.play()
         audio.onended = audio.onerror = function() { stopSpeakBtn(btn) }
       })
-      .catch(function(err) { console.error('🔊 Voix HeyGen (' + agentKey + ') :', err.message); speakViaBrowser(btn, clean, agentKey) })
+      .catch(function(err) { console.error('🔊 Voix (' + agentKey + ') : ' + err.message); btn.title = err.message; btn.textContent = '⚠️ Voix indisponible'; setTimeout(function(){ stopSpeakBtn(btn) }, 2500) })
     }
 
     function speakViaBrowser(btn, clean, agentKey) {
@@ -1104,18 +1050,15 @@
 
     var _msgDiane = null;
     var AGENT_WELCOME_AUDIO = {
-      nyxia:  '/AccueilNyXiaClientes.mp3',
-      selena: '/Bienvenue_dans_le_portail_miroir_Selena.mp3',
-      kael:   '/Bienvenue_dans_le_portail_relationnel_Kael.mp3',
-      lena:   '/Bienvenue_dans_le_portail_spirituel_Lena.mp3',
-      alex:   '/Bienvenue_dans_le_portail_auteur_Alex.mp3',
-      eric:   '/Bienvenue_dans_le_portail_gardienne_Eric.mp3'
+      nyxia: '/AccueilNyXiaClientes.mp3',
+      diane: '/Bienvenue_Diane.mp3',   // 👉 Diane : pousse ce fichier (ou ajuste le nom)
+      eric:  '/Bienvenue_Eric_CashFlow.mp3'  // 👉 pousse ce fichier (ou ajuste le nom)
     }
 
     // Vidéos d'accueil (Alexya.ia) — jouées UNE fois à la première visite de chaque
     // personnage, toujours EN PLUS du texte de bienvenue, jamais à sa place.
     var AGENT_WELCOME_VIDEO = {
-      kael: '/VideoBienvenueKael.mp4'
+      eric: '/VideoBienvenueEric.mp4'   // 👉 Diane : pousse la vidéo d'Éric sous ce nom exact sur GitHub
     }
 
     function jouerMessageDiane() {
