@@ -15,6 +15,6 @@ id = "106db6da016d49d2b480452f19bad695"
 binding = "AI"
 
 # Ajout de Vectorize pour les cerveaux d'Éric et NyXia
-# [[vectorize]]
-# binding = "VECTORIZE_INDEX"
-# index_name = "univers-livres"
+[[vectorize]]
+binding = "VECTORIZE_INDEX"
+index_name = "univers-livres"
