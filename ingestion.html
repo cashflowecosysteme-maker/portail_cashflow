@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/png" href="/FavIcon.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🧠 Remplir les cerveaux — NyXia</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg1:#0A1628; --p:#7B5CFF; --p2:#5A6CFF; --p3:#4FA3FF; --gold:#F4C842; --t:#fff; --t2:#D6D9F0; --t3:#8891B8; --green:#00E676; --red:#FF4B6E; }
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+    html,body{min-height:100%;background:var(--bg1);color:var(--t2);font-family:'Outfit',sans-serif}
+    body{padding:32px 20px 60px}
+    canvas#starry-canvas{position:fixed;inset:0;z-index:0;pointer-events:none}
+    body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+      background:radial-gradient(ellipse 60% 50% at 30% 12%,rgba(123,92,255,0.15) 0%,transparent 65%),radial-gradient(ellipse 50% 40% at 75% 88%,rgba(79,163,255,0.08) 0%,transparent 60%)}
+    .wrap{position:relative;z-index:1;max-width:680px;margin:0 auto}
+    h1{font-family:'Space Grotesk',sans-serif;font-size:26px;color:var(--t);margin-bottom:4px}
+    .lead{color:var(--t3);font-size:13px;margin-bottom:26px}
+    .card{background:rgba(123,92,255,0.06);border:1px solid rgba(123,92,255,0.16);border-radius:16px;padding:22px;margin-bottom:18px;backdrop-filter:blur(6px)}
+    label{display:block;font-size:12px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px}
+    input,select{width:100%;background:rgba(10,22,40,0.7);border:1px solid rgba(123,92,255,0.25);border-radius:10px;color:var(--t);font-family:'Outfit',sans-serif;font-size:15px;padding:12px 14px;outline:none}
+    input:focus,select:focus{border-color:rgba(123,92,255,0.6)}
+    input[type=file]{padding:10px}
+    .btn{width:100%;padding:14px;border-radius:50px;border:none;background:linear-gradient(135deg,var(--p),var(--p2));color:#fff;font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 0 24px rgba(123,92,255,0.4);transition:.2s;margin-top:8px}
+    .btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 0 40px rgba(123,92,255,0.6)}
+    .btn:disabled{opacity:.5;cursor:not-allowed}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .hidden{display:none}
+    .msg{font-size:13px;margin-top:12px;text-align:center}
+    .msg.err{color:var(--red)} .msg.ok{color:var(--green)}
+    .progress-wrap{height:10px;background:rgba(10,22,40,0.8);border-radius:50px;overflow:hidden;margin:16px 0 10px}
+    .progress-bar{height:100%;width:0;background:linear-gradient(90deg,var(--p),var(--p3));transition:width .2s}
+    .log{max-height:220px;overflow-y:auto;font-size:12px;color:var(--t3);background:rgba(10,22,40,0.6);border-radius:10px;padding:12px;margin-top:12px;line-height:1.7;font-family:monospace}
+    .log .ok{color:var(--green)} .log .err{color:var(--red)}
+    h2{font-family:'Space Grotesk',sans-serif;font-size:15px;color:var(--t);margin-bottom:14px}
+    .hint{font-size:12px;color:var(--t3);margin-top:8px;line-height:1.6}
+  </style>
+</head>
+<body>
+  <canvas id="starry-canvas"></canvas>
+  <div class="wrap">
+    <h1>🧠 Remplir les cerveaux</h1>
+    <p class="lead">Dépose tes Markdown, choisis le personnage, clique. Ça découpe et remplit le cerveau Vectorize tout seul. Réutilisable pour tous tes livres et portails. ✦</p>
+
+    <!-- LOGIN ADMIN -->
+    <div class="card" id="login-card">
+      <h2>🔑 Connexion admin</h2>
+      <label for="pw">Mot de passe Super Admin</label>
+      <input type="password" id="pw" placeholder="••••••••" autocomplete="current-password">
+      <button class="btn" id="btn-login" onclick="doLogin()">Se connecter</button>
+      <div class="msg" id="login-msg"></div>
+    </div>
+
+    <!-- INGESTION -->
+    <div class="card hidden" id="ingest-card">
+      <h2>📚 Ingérer un ou plusieurs livres</h2>
+      <div class="row">
+        <div>
+          <label for="cible">Cerveau (personnage)</label>
+          <select id="cible">
+            <option value="eric">🔥 Éric (technique / livres)</option>
+            <option value="nyxia">✦ NyXia (mémoire de l'univers)</option>
+            <option value="diane">👑 Diane (vision)</option>
+          </select>
+        </div>
+        <div>
+          <label for="source">Nom du livre (source)</label>
+          <input type="text" id="source" placeholder="Ex : Psychologie du Clic">
+        </div>
+      </div>
+      <div style="margin-top:14px">
+        <label for="files">Fichiers Markdown (.md, plusieurs possibles)</label>
+        <input type="file" id="files" accept=".md,.markdown,.txt" multiple onchange="preview()">
+      </div>
+      <div class="hint" id="preview-hint"></div>
+      <button class="btn" id="btn-ingest" onclick="startIngest()" disabled>🚀 Remplir le cerveau</button>
+      <div class="progress-wrap hidden" id="pw-wrap"><div class="progress-bar" id="pbar"></div></div>
+      <div class="log hidden" id="log"></div>
+    </div>
+  </div>
+
+  <script src="/starry-bg.js" defer></script>
+  <script>
+    var TOKEN = null;
+    var FILES = [];
+
+    function doLogin(){
+      var pw = document.getElementById('pw').value.trim();
+      var msg = document.getElementById('login-msg');
+      if(!pw){ msg.className='msg err'; msg.textContent='Entre ton mot de passe.'; return; }
+      var btn = document.getElementById('btn-login'); btn.disabled=true; btn.textContent='Connexion...';
+      fetch('/api/admin/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})})
+        .then(function(r){return r.json()})
+        .then(function(d){
+          if(d.success && d.token){
+            TOKEN=d.token;
+            document.getElementById('login-card').classList.add('hidden');
+            document.getElementById('ingest-card').classList.remove('hidden');
+          } else { msg.className='msg err'; msg.textContent=d.error||'Mot de passe incorrect.'; btn.disabled=false; btn.textContent='Se connecter'; }
+        })
+        .catch(function(){ msg.className='msg err'; msg.textContent='Impossible de joindre le Worker.'; btn.disabled=false; btn.textContent='Se connecter'; });
+    }
+
+    // Découpe un Markdown en passages ~900 caractères (par paragraphes)
+    function chunkMarkdown(text, target){
+      target = target || 900;
+      var blocks = text.replace(/\r/g,'').split(/\n\s*\n/);
+      var chunks = [], cur = '';
+      function hardSlice(b){
+        var out=[], start=0;
+        while(start < b.length){
+          var end = Math.min(start+target, b.length);
+          if(end < b.length){ var sp = b.lastIndexOf(' ', end); if(sp > start+200) end = sp; }
+          out.push(b.slice(start,end).trim()); start = end;
+        }
+        return out;
+      }
+      for(var i=0;i<blocks.length;i++){
+        var b = blocks[i].trim(); if(!b) continue;
+        if(b.length > target*1.6){
+          if(cur){ chunks.push(cur); cur=''; }
+          hardSlice(b).forEach(function(p){ if(p) chunks.push(p); });
+          continue;
+        }
+        if(cur && (cur+'\n\n'+b).length > target){ chunks.push(cur); cur=b; }
+        else { cur += (cur?'\n\n':'')+b; }
+      }
+      if(cur.trim()) chunks.push(cur.trim());
+      return chunks.filter(function(c){ return c.length > 25; });
+    }
+
+    function slug(s){ return (s||'livre').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40); }
+
+    function readFile(f){ return new Promise(function(res){ var r=new FileReader(); r.onload=function(){res(r.result)}; r.readAsText(f); }); }
+
+    async function preview(){
+      FILES = Array.from(document.getElementById('files').files);
+      var hint = document.getElementById('preview-hint');
+      var btn = document.getElementById('btn-ingest');
+      if(!FILES.length){ hint.textContent=''; btn.disabled=true; return; }
+      if(!document.getElementById('source').value && FILES[0]) document.getElementById('source').value = FILES[0].name.replace(/\.(md|markdown|txt)$/i,'');
+      var total=0;
+      for(var i=0;i<FILES.length;i++){ var txt=await readFile(FILES[i]); total += chunkMarkdown(txt).length; }
+      hint.textContent = FILES.length+' fichier(s) → environ '+total+' passages à envoyer.';
+      btn.disabled=false;
+    }
+
+    async function startIngest(){
+      var cible = document.getElementById('cible').value;
+      var sourceBase = document.getElementById('source').value.trim() || 'livre';
+      var btn = document.getElementById('btn-ingest'); btn.disabled=true; btn.textContent='En cours...';
+      var pwWrap=document.getElementById('pw-wrap'), pbar=document.getElementById('pbar'), log=document.getElementById('log');
+      pwWrap.classList.remove('hidden'); log.classList.remove('hidden'); log.innerHTML='';
+
+      // Prépare tous les passages
+      var all=[];
+      for(var i=0;i<FILES.length;i++){
+        var txt = await readFile(FILES[i]);
+        var src = FILES.length>1 ? (sourceBase+' — '+FILES[i].name.replace(/\.(md|markdown|txt)$/i,'')) : sourceBase;
+        var chunks = chunkMarkdown(txt);
+        var fslug = slug(src);
+        chunks.forEach(function(c,idx){ all.push({ id: cible+'-'+fslug+'-'+idx, texte:c, source:src, personnage:cible }); });
+      }
+
+      var ok=0, ko=0;
+      for(var k=0;k<all.length;k++){
+        try{
+          var r = await fetch('/api/ingest-book',{method:'POST',headers:{'Content-Type':'application/json','X-Admin-Token':TOKEN},body:JSON.stringify(all[k])});
+          var d = await r.json();
+          if(r.ok && d.success){ ok++; }
+          else { ko++; log.innerHTML += '<div class="err">✗ '+all[k].id+' : '+(d.error||('HTTP '+r.status))+'</div>'; }
+        }catch(e){ ko++; log.innerHTML += '<div class="err">✗ '+all[k].id+' : réseau</div>'; }
+        pbar.style.width = Math.round(((k+1)/all.length)*100)+'%';
+        if((k+1)%10===0 || k===all.length-1){ log.innerHTML += '<div class="ok">→ '+(k+1)+'/'+all.length+' envoyés</div>'; log.scrollTop=log.scrollHeight; }
+        await new Promise(function(res){ setTimeout(res, 120); }); // doux pour éviter les limites
+      }
+
+      log.innerHTML += '<div class="ok">✅ Terminé : '+ok+' passages dans le cerveau « '+cible+' »'+(ko?(' — '+ko+' échecs'):'')+'.</div>';
+      log.scrollTop=log.scrollHeight;
+      btn.disabled=false; btn.textContent='🚀 Remplir le cerveau';
+    }
+  </script>
+</body>
+</html>
