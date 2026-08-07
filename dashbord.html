@@ -745,7 +745,18 @@
       div.innerHTML = avatarHtmlFor(agentKey)
       div.appendChild(wrapper)
       msgs.appendChild(div); msgs.scrollTop = msgs.scrollHeight
-      video.play().catch(function() { /* lecture auto bloquée par le navigateur — le membre peut cliquer play elle-même */ })
+      video.play().catch(function() {
+        // Lecture auto bloquée (pas encore de clic) : on lance au tout premier geste du membre.
+        var go = function() {
+          video.play().catch(function(){})
+          document.removeEventListener('click', go)
+          document.removeEventListener('keydown', go)
+          document.removeEventListener('touchstart', go)
+        }
+        document.addEventListener('click', go)
+        document.addEventListener('keydown', go)
+        document.addEventListener('touchstart', go)
+      })
     }
 
     // Accès direct depuis la barre latérale ("Mon Espace") — fonctionne peu importe
