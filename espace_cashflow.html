@@ -406,5 +406,17 @@
     }
   </script>
 
+  <script>
+    /* ── Garde d'authentification : protège la page même en accès direct ── */
+    ;(function(){
+      var t = sessionStorage.getItem('nyxia_token');
+      if (!t) { location.replace('/login.html'); return; }
+      fetch('/api/check-auth', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ token:t }) })
+        .then(function(r){ return r.json(); })
+        .then(function(d){ if (!d.valid) location.replace('/login.html'); })
+        .catch(function(){});
+    })();
+  </script>
+
 </body>
 </html>
