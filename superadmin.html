@@ -343,20 +343,20 @@ tr:hover td{background:rgba(123,92,255,0.05)}
       <div class="panel-header">
         <div>
           <div class="panel-title">💌 Messagerie</div>
-          <div class="panel-subtitle">Envoie un message à une Gardienne précise, ou une diffusion à toutes</div>
+          <div class="panel-subtitle">Envoie un message à un Membre précis, ou une diffusion à tous</div>
         </div>
       </div>
       <div class="form-grid">
         <div class="field">
           <label>Destinataire</label>
           <select id="msg-admin-recipient">
-            <option value="">— Choisir une Gardienne —</option>
+            <option value="">— Choisir un Membre —</option>
           </select>
         </div>
         <div class="field">
           <label class="checkbox-label" style="margin-top:28px">
             <input type="checkbox" id="msg-admin-broadcast" onchange="toggleBroadcastMode(this)">
-            <span>📢 Diffusion à toutes les Gardiennes (ignore le destinataire ci-dessus)</span>
+            <span>📢 Diffusion à tous les Membres (ignore le destinataire ci-dessus)</span>
           </label>
         </div>
       </div>
@@ -788,7 +788,7 @@ function populateMessageRecipients() {
   var sel = document.getElementById('msg-admin-recipient');
   if (!sel) return;
   var current = sel.value;
-  sel.innerHTML = '<option value="">— Choisir une Gardienne —</option>';
+  sel.innerHTML = '<option value="">— Choisir un Membre —</option>';
   accounts.filter(function(a) { return (a.role || 'client') !== 'superadmin'; }).forEach(function(a) {
     var opt = document.createElement('option');
     opt.value = a.email;
@@ -831,7 +831,7 @@ async function sendAdminMessage() {
     });
 
     if (res.success) {
-      status.textContent = '✅ Envoyé à ' + res.sentTo + (res.sentTo > 1 ? ' Gardiennes' : ' Gardienne') + '.';
+      status.textContent = '✅ Envoyé à ' + res.sentTo + (res.sentTo > 1 ? ' Membres' : ' Membre') + '.';
       status.style.color = 'var(--green)';
       document.getElementById('msg-admin-subject').value = '';
       document.getElementById('msg-admin-body').value = '';
