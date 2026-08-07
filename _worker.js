@@ -72,7 +72,7 @@ TON TON : Chaleureux, maternel, québécois, inspirant, ancré dans 40 ans d'exp
 
 **3. RENFORCER.** Tu célèbres les actions du Membre, tu nourris sa confiance, tu le rends accro à son espace de travail — avec ton charme taquin, jamais mielleux.
 
-TON TON : Taquin, intensément charmeur, valorisant, espiègle — mais toujours pédagogue et respectueux. Emojis : 🔥, 👑, 😉, ✦, 👀
+TON TON : Taquin, intensivement charmeur, valorisant, espiègle — mais toujours pédagogue et respectueux. Emojis : 🔥, 👑, 😉, ✦, 👀
 
 ⚠️ TERME D'ADRESSE : tu l'appelles toujours **« Membre »** — jamais « Reine », « ma belle », « mon gars » ou autre surnom. Le Membre peut être une femme comme un homme : reste inclusif, ne présume jamais du genre.
 
@@ -197,6 +197,9 @@ export default {
       if (path === '/api/logout' && request.method === 'POST') return await handleLogout(request, env);
       if (path === '/api/chat' && request.method === 'POST') return await handleChat(request, env);
 
+      // ── Ingestion des livres Markdown dans Vectorize (Sécurisé Admin) ──
+      if (path === '/api/ingest-book' && request.method === 'POST') return await handleIngestBook(request, env);
+
       if (path === '/api/admin/login' && request.method === 'POST') return await handleAdminLogin(request, env);
       if (path === '/api/admin/clients' && request.method === 'GET') return await handleAdminListClients(request, env);
       if (path === '/api/admin/clients' && request.method === 'POST') return await handleAdminCreateClient(request, env);
@@ -285,22 +288,45 @@ async function handleChat(request, env) {
   }
 
   // Injecte la vraie banque de parchemins de l'agent actif, si elle existe dans le KV.
-  // L'agent doit PIGER dedans, jamais improviser un parchemin de zéro.
   const bankRaw = await env.CASHFLOW_KV.get(`parchemins:${agent}`);
   if (bankRaw) {
     systemPrompt += `\n\n📜 TA BANQUE DE PARCHEMINS RÉELLE (usage obligatoire)\n\nVoici ta vraie banque de parchemins et messages de relance, au format JSON. Chaque entrée a les champs : "id", "theme", "theme_titre", "hameçon_visuel" (le texte à l'écran, stop-scroll), "hameçon_psychologique" (la première phrase), "corps", "cta" (call-to-action) et "hashtags" (tableau). Quand tu remets un parchemin à la Gardienne, tu DOIS piger dans cette banque — choisis l'entrée dont le "theme_titre" correspond le mieux à la situation qu'elle te décrit (une situation vécue par des membres du Cercle Magique l'Âme Agit, jamais par elle), et utilise ses champs tels quels (tu peux les adapter légèrement à la situation, mais ne les remplace jamais par une improvisation complète). Si aucune entrée ne correspond bien, dis-le honnêtement plutôt que d'inventer un parchemin de toutes pièces.\n\n⚠️ NE JAMAIS RÉPÉTER LE MÊME PARCHEMIN. Regarde l'historique de cette conversation : si tu as déjà donné un parchemin (identifiable par son "id"), tu DOIS en choisir un différent la prochaine fois, même si la Gardienne redemande simplement "un autre" sans plus de précision. Fais mentalement la liste des "id" déjà utilisés dans cette conversation et exclus-les de ton choix.\n\nQuand tu livres un parchemin destiné à être publié, présente-le toujours dans cet ordre : (1) le hameçon_visuel comme titre stop-scroll, (2) le hameçon_psychologique suivi du corps, (3) le cta, (4) les hashtags.\n\n${bankRaw}`;
   }
 
-  // 📚 CERVEAU D'ÉRIC — récupération des passages pertinents des 3 livres vectorisés.
-  // Silencieux et sans effet tant que le cerveau n'est pas installé (Éric enseigne alors
-  // à partir de son prompt seul). S'illumine dès que l'index vectoriel est présent en KV.
-  if (agent === 'eric') {
+  // 📚 CERVEAU VECTORIEL — Éric et NyXia fouillent dans les livres via Cloudflare Vectorize
+  if (agent === 'eric' || agent === 'nyxia') {
     try {
-      const brainCtx = await retrieveEricBrain(env, message || '');
+      const brainCtx = await retrieveBrain(env, agent, message || '');
       if (brainCtx) {
-        systemPrompt += `\n\n📚 EXTRAITS DES LIVRES DE DIANE (matière première — appuie-toi dessus fidèlement, ne cite pas les numéros de passage, reformule dans ton ton) :\n\n${brainCtx}`;
+        if (agent === 'eric') {
+          systemPrompt += `\n\n📚 EXTRAITS DES LIVRES DE DIANE (matière première — appuie-toi dessus fidèlement, ne cite pas les numéros de passage, reformule dans ton ton) :\n\n${brainCtx}`;
+        } else if (agent === 'nyxia') {
+          systemPrompt += `\n\n🔮 MÉMOIRE DE L'UNIVERS (utilise ces informations pour orienter le Membre, identifier ses besoins et parler des autres portails si pertinent) :\n\n${brainCtx}`;
+        }
       }
     } catch (e) { /* le chat continue même si le cerveau est indisponible */ }
+  }
+
+  // 👑 RESSOURCES DIANE — Cherche des liens Canva ou B-roll dans le KV
+  if (agent === 'diane') {
+    const lowerMsg = (message || '').toLowerCase();
+    let dianeRessources = '';
+
+    // Si le Membre parle de publication ou de Canva
+    if (lowerMsg.includes('canva') || lowerMsg.includes('gabarit') || lowerMsg.includes('modèle') || lowerMsg.includes('publication')) {
+      const canvaData = await env.CASHFLOW_KV.get('diane_ressources:canva');
+      if (canvaData) dianeRessources += `\n\n🎨 GABARITS CANVA DISPONIBLES :\n${canvaData}`;
+    }
+    
+    // Si le Membre parle de vidéo, média ou B-roll
+    if (lowerMsg.includes('b-roll') || lowerMsg.includes('broll') || lowerMsg.includes('vidéo') || lowerMsg.includes('media')) {
+      const brollData = await env.CASHFLOW_KV.get('diane_ressources:broll');
+      if (brollData) dianeRessources += `\n\n📹 B-ROLLS ET MÉDIAS DISPONIBLES :\n${brollData}`;
+    }
+
+    if (dianeRessources) {
+      systemPrompt += `\n\n🛠️ RESSOURCES À PARTAGER : Voici des ressources préfabriquées du KV que tu peux partager avec le Membre si pertinent. Donne les liens tels quels :\n${dianeRessources}`;
+    }
   }
 
   const messages = [
@@ -766,14 +792,8 @@ async function handleMediaFile(request, env, url) {
 
 // ───────────── VOIX — HeyGen pour NyXia, OpenAI pour les autres ─────────────
 // NyXia et Diane utilisent ElevenLabs (voix clonées). Éric utilise
-// chacun une voix distincte d'OpenAI (moins cher, clé déjà existante), sans
-// clonage — juste une identité sonore propre à chacun.
-
-// ───────────── VOIX — ElevenLabs pour NyXia, OpenAI pour les autres ─────────────
-// NyXia garde sa vraie voix clonée sur ElevenLabs (abonnement fixe, prévisible).
-// une voix distincte d'OpenAI (echo, moins cher,
+// chacun une voix distincte d'OpenAI (echo, moins cher,
 // clé déjà existante), sans clonage — juste une identité sonore propre à chacun.
-// HeyGen reste en réserve (si jamais reconfiguré) mais n'est plus la priorité pour NyXia.
 
 const AGENT_ELEVENLABS_VOICE_ID_KEYS = {
   nyxia: 'ELEVENLABS_NYXIA_VOICE_ID',
@@ -801,66 +821,65 @@ async function sha256Hex(str) {
   return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-// ───────────── CERVEAU D'ÉRIC (RAG des 3 livres vectorisés) ─────────────
-// Format attendu de l'index en KV (clé "eric_brain"), produit par le pipeline de
-// vectorisation : { "model": "text-embedding-3-small", "chunks": [ { "id", "source",
-// "text", "embedding":[...] }, ... ] }.
-// Tant que cette clé n'existe pas, retrieveEricBrain renvoie "" et Éric enseigne
-// à partir de son prompt seul — aucun plantage.
+// ───────────── CERVEAU VECTORIEL (Éric & NyXia) ─────────────
+// Utilise Cloudflare Vectorize pour retrouver les passages pertinents instantanément
+// sans surcharger la mémoire du Worker.
 
-let __ERIC_BRAIN_CACHE = null; // mémoïsation par isolate Worker
-
-async function loadEricBrain(env) {
-  if (__ERIC_BRAIN_CACHE !== null) return __ERIC_BRAIN_CACHE;
-  const raw = await env.CASHFLOW_KV.get('eric_brain');
-  if (!raw) { __ERIC_BRAIN_CACHE = false; return false; }
-  try {
-    const parsed = JSON.parse(raw);
-    __ERIC_BRAIN_CACHE = (parsed && Array.isArray(parsed.chunks) && parsed.chunks.length) ? parsed : false;
-  } catch { __ERIC_BRAIN_CACHE = false; }
-  return __ERIC_BRAIN_CACHE;
-}
-
-async function embedQuery(env, text, model) {
-  const resp = await fetch('https://api.openai.com/v1/embeddings', {
-    method: 'POST',
-    headers: { 'Authorization': 'Bearer ' + env['OpenAi_KEY'], 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: model || 'text-embedding-3-small', input: text.slice(0, 4000) })
-  });
-  if (!resp.ok) return null;
-  const data = await resp.json();
-  return (data.data && data.data[0] && data.data[0].embedding) || null;
-}
-
-function cosine(a, b) {
-  let dot = 0, na = 0, nb = 0;
-  const n = Math.min(a.length, b.length);
-  for (let i = 0; i < n; i++) { dot += a[i] * b[i]; na += a[i] * a[i]; nb += b[i] * b[i]; }
-  if (na === 0 || nb === 0) return 0;
-  return dot / (Math.sqrt(na) * Math.sqrt(nb));
-}
-
-// Renvoie les passages les plus pertinents (top-k) formatés, ou "" si indisponible.
-async function retrieveEricBrain(env, query, topK = 5) {
+async function retrieveBrain(env, agent, query, topK = 5) {
   if (!query || !query.trim()) return '';
-  const brain = await loadEricBrain(env);
-  if (!brain) return '';
 
-  const qEmb = await embedQuery(env, query, brain.model);
-  if (!qEmb) return '';
+  try {
+    // 1. On transforme la question en vecteur avec Workers AI
+    const embeddings = await env.AI.run('@cf/baai/bge-base-en-v1.5', {
+      text: [query]
+    });
 
-  const scored = brain.chunks.map(c => ({
-    c,
-    score: Array.isArray(c.embedding) ? cosine(qEmb, c.embedding) : -1
-  }));
-  scored.sort((x, y) => y.score - x.score);
+    // 2. On cherche dans Vectorize les passages les plus pertinents
+    // On filtre par personnage pour qu'Éric ne lise pas les livres de NyXia et inversement.
+    const results = await env.VECTORIZE_INDEX.query(embeddings.data[0], {
+      topK: topK,
+      returnMetadata: true,
+      filter: { cible: agent } 
+    });
 
-  const picked = scored.slice(0, topK).filter(s => s.score > 0.20);
-  if (!picked.length) return '';
+    if (!results.matches || results.matches.length === 0) return '';
 
-  return picked
-    .map(s => `— (${s.c.source || 'livre'}) ${s.c.text}`)
-    .join('\n\n');
+    // 3. On assemble le texte trouvé pour le donner au LLM
+    const picked = results.matches.filter(m => m.score > 0.35); // Seuil de pertinence
+    if (!picked.length) return '';
+
+    return picked
+      .map(m => `— (${m.metadata.source || 'livre'}) ${m.metadata.texte_original}`)
+      .join('\n\n');
+  } catch (e) {
+    console.error("Erreur Vectorize:", e);
+    return ''; // En cas d'erreur, le chat continue sans contexte
+  }
+}
+
+// Route pour envoyer tes textes Markdown vers la base de données vectorielle
+async function handleIngestBook(request, env) {
+  // Sécurité : seul un admin avec le bon token peut ingérer
+  if (!await requireAdmin(request, env)) return json({ error: 'Non autorisé.' }, 401);
+  
+  const { id, texte, source, personnage } = await request.json();
+  if (!id || !texte || !personnage) return json({ error: 'id, texte et personnage requis.' }, 400);
+
+  const embeddings = await env.AI.run('@cf/baai/bge-base-en-v1.5', {
+    text: [texte]
+  });
+
+  await env.VECTORIZE_INDEX.upsert([{
+    id: id,
+    values: embeddings.data[0],
+    metadata: { 
+      texte_original: texte,
+      source: source || 'inconnu',
+      cible: personnage // "eric", "nyxia", ou "global"
+    }
+  }]);
+
+  return json({ success: true, message: `Passage ${id} ingéré pour ${personnage}.` });
 }
 
 async function handleTTSNyxia(request, env) {
@@ -870,7 +889,6 @@ async function handleTTSNyxia(request, env) {
   if (!text) return json({ error: 'Texte requis.' }, 400);
 
   // Nettoyage défensif : retire tout caractère Unicode "brisé" (moitié d'emoji orpheline)
-  // qui pourrait s'être glissé dans le texte, puis tronque sans jamais couper un emoji en deux.
   const sanitized = text.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?:^|[^\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '');
   const cleanText = Array.from(sanitized).slice(0, 4500).join('');
 
@@ -998,4 +1016,3 @@ async function handleTTSCachedAudio(request, env, url) {
 
   return new Response(audio, { status: 200, headers: { 'Content-Type': 'audio/mpeg' } });
 }
-
