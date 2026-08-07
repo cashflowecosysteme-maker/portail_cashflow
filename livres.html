@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/png" href="/FavIcon.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🎧 Livres de la formation — NyXia</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg:#060a18; --p:#7B5CFF; --p2:#5A6CFF; --p3:#a78bfa; --gold:#F4C842; --t:#fff; --t2:#D6D9F0; --t3:#8891B8; }
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    /* Base anti-copie : sélection et menu contextuel désactivés sur le contenu protégé */
+    html, body { min-height:100%; background:var(--bg); color:var(--t2); font-family:'Outfit',sans-serif;
+      -webkit-user-select:none; -moz-user-select:none; user-select:none; }
+    body {
+      background:
+        radial-gradient(ellipse 80% 60% at 40% 0%, rgba(50,15,110,0.55) 0%, transparent 70%),
+        radial-gradient(ellipse 50% 40% at 85% 15%, rgba(30,10,80,0.35) 0%, transparent 60%),
+        var(--bg);
+      padding:32px 24px 60px;
+    }
+    .wrap { max-width:760px; margin:0 auto; }
+    .eyebrow { font-size:11px; font-weight:600; letter-spacing:3px; text-transform:uppercase; color:var(--p3); opacity:.8; margin-bottom:8px; }
+    h1 { font-family:'Space Grotesk',sans-serif; font-size:28px; font-weight:700; color:var(--t); margin-bottom:6px; }
+    .lead { color:var(--t3); font-size:13px; margin-bottom:28px; }
+
+    .book { background:rgba(123,92,255,0.05); border:1px solid rgba(123,92,255,0.14); border-radius:16px;
+      padding:22px; margin-bottom:16px; }
+    .book-top { display:flex; align-items:center; gap:16px; margin-bottom:14px; }
+    .book-cover { width:56px; height:56px; border-radius:12px; flex-shrink:0;
+      background:linear-gradient(135deg,var(--p),var(--p2)); display:flex; align-items:center; justify-content:center; font-size:26px;
+      box-shadow:0 0 24px rgba(123,92,255,0.35); }
+    .book-title { font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:16px; color:var(--t); }
+    .book-sub { font-size:12px; color:var(--t3); margin-top:2px; }
+    .row { display:flex; flex-wrap:wrap; gap:10px; }
+    .btn { display:inline-flex; align-items:center; gap:8px; padding:11px 18px; border-radius:50px; cursor:pointer;
+      font-family:'Outfit',sans-serif; font-weight:600; font-size:13px; text-decoration:none; border:1px solid rgba(123,92,255,0.3);
+      background:rgba(123,92,255,0.12); color:#fff; transition:all .25s; }
+    .btn:hover { background:rgba(123,92,255,0.22); box-shadow:0 0 24px rgba(123,92,255,0.4); transform:translateY(-1px); }
+    .btn.gold { border-color:rgba(244,200,66,0.35); background:rgba(244,200,66,0.1); color:var(--gold); }
+    .btn.gold:hover { background:rgba(244,200,66,0.18); box-shadow:0 0 24px rgba(244,200,66,0.3); }
+    audio { width:100%; margin-top:12px; filter:hue-rotate(220deg) saturate(1.2); }
+    .hint { font-size:11px; color:var(--t3); opacity:.7; margin-top:10px; font-style:italic; }
+    .footer { text-align:center; color:var(--t3); font-size:11px; opacity:.6; margin-top:34px; }
+  </style>
+</head>
+<body oncontextmenu="return false" ondragstart="return false" oncopy="return false">
+  <div class="wrap">
+    <div class="eyebrow">📚 Espace de formation</div>
+    <h1>🎧 Livres de la formation</h1>
+    <p class="lead">Tes trois compagnons pour bâtir ta communication à l'ère numérique — en lecture protégée et en audio. 💜</p>
+
+    <!-- ══════════════════════════════════════════════════════════════
+         👉 Diane : pour CHAQUE livre, remplace les href="#" par le chemin
+            de ton PDF (protégé) et de ton MP3 audio une fois poussés sur GitHub.
+            Le lecteur PDF anti-copie paginé (contenu KV/D1, sans téléchargement)
+            s'installera à l'étape suivante quand tu m'enverras les PDF.
+    ═══════════════════════════════════════════════════════════════ -->
+
+    <div class="book">
+      <div class="book-top">
+        <div class="book-cover">🖱️</div>
+        <div>
+          <div class="book-title">La Psychologie du Clic</div>
+          <div class="book-sub">Comprendre ce qui déclenche l'action en ligne</div>
+        </div>
+      </div>
+      <div class="row">
+        <a class="btn" href="#" target="_blank">📖 Lire (lecture protégée)</a>
+        <a class="btn gold" href="#" target="_blank">⬇️ Version papier</a>
+      </div>
+      <!-- <audio controls controlsList="nodownload" src="/audio/psychologie-du-clic.mp3"></audio> -->
+      <div class="hint">Audio à venir — ajoute la balise &lt;audio&gt; ci-dessus quand ton MP3 est prêt.</div>
+    </div>
+
+    <div class="book">
+      <div class="book-top">
+        <div class="book-cover">💰</div>
+        <div>
+          <div class="book-title">CashFlow Neurogénéré</div>
+          <div class="book-sub">Calme ton système nerveux, libère ta richesse</div>
+        </div>
+      </div>
+      <div class="row">
+        <a class="btn" href="#" target="_blank">📖 Lire (lecture protégée)</a>
+        <a class="btn gold" href="#" target="_blank">⬇️ Version papier</a>
+      </div>
+      <div class="hint">Audio à venir — ajoute la balise &lt;audio&gt; quand ton MP3 est prêt.</div>
+    </div>
+
+    <div class="book">
+      <div class="book-top">
+        <div class="book-cover">📡</div>
+        <div>
+          <div class="book-title">La Communication à l'ère Numérique</div>
+          <div class="book-sub">Le cœur de la formation enseignée par Éric</div>
+        </div>
+      </div>
+      <div class="row">
+        <a class="btn" href="#" target="_blank">📖 Lire (lecture protégée)</a>
+        <a class="btn gold" href="#" target="_blank">⬇️ Version papier</a>
+      </div>
+      <div class="hint">Audio à venir — ajoute la balise &lt;audio&gt; quand ton MP3 est prêt.</div>
+    </div>
+
+    <div class="footer">© 2026 NyXia Agents™ — Portail CashFlow · lecture protégée</div>
+  </div>
+
+  <script>
+    /* ── Garde d'authentification : protège la page même en accès direct ── */
+    ;(function(){
+      var t = sessionStorage.getItem('nyxia_token');
+      if (!t) { location.replace('/login.html'); return; }
+      fetch('/api/check-auth', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ token:t }) })
+        .then(function(r){ return r.json(); })
+        .then(function(d){ if (!d.valid) location.replace('/login.html'); })
+        .catch(function(){});
+    })();
+  </script>
+</body>
+</html>
