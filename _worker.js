@@ -296,7 +296,7 @@ async function handleChat(request, env) {
   }
 
   // 📚 CERVEAU VECTORIEL — Éric et NyXia fouillent dans les livres via Cloudflare Vectorize
-  if (agent === 'eric' || agent === 'nyxia' || agent === 'diane') {
+  if (agent) { // universel : tout personnage cherche dans son namespace ; s'il est vide, rien n'est ajouté
     try {
       const brainCtx = await retrieveBrain(env, agent, message || '');
       if (brainCtx) {
@@ -306,6 +306,8 @@ async function handleChat(request, env) {
           systemPrompt += `\n\n🔮 MÉMOIRE DE L'UNIVERS (utilise ces informations pour orienter le Membre, identifier ses besoins et parler des autres portails si pertinent) :\n\n${brainCtx}`;
         } else if (agent === 'diane') {
           systemPrompt += `\n\n📖 TES PROPRES ÉCRITS ET TA VISION (tu es l'autrice de ces textes — parle-en à la première personne, dans ta voix, pour transmettre ta pensée et ton « pourquoi ») :\n\n${brainCtx}`;
+        } else {
+          systemPrompt += `\n\n📚 EXTRAITS DE TES DOCUMENTS DE RÉFÉRENCE (matière première — appuie-toi dessus fidèlement, reformule dans ton ton, ne cite jamais de numéros de passage) :\n\n${brainCtx}`;
         }
       }
     } catch (e) { /* le chat continue même si le cerveau est indisponible */ }
