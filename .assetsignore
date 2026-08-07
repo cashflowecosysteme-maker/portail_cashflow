@@ -1,1 +1,9 @@
 
+_worker.js
+_assetsignore
+wrangler.toml
+.assetsignore
+cerveau-nyxia-cliente.js
+js/cerveau-nyxia-cliente.js
+.git
+node_modules
