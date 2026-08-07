@@ -245,12 +245,6 @@
             <span id="attach-name"></span>
             <button id="btn-clear-attach" style="background:none;border:none;color:var(--t4);cursor:pointer;font-size:14px">✕</button>
           </div>
-          <div id="nyxia-voice-toggle" style="display:none;padding:8px 20px;background:rgba(123,92,255,0.06);border-top:1px solid rgba(123,92,255,0.1);align-items:center;gap:8px;flex-shrink:0;font-size:12px;color:var(--t3)">
-            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
-              <input type="checkbox" id="chk-nyxia-voice" onchange="_nyxiaVoiceAuto = this.checked">
-              🔊 Réponses vocales automatiques de NyXia (coût limité — désactivé par défaut)
-            </label>
-          </div>
           <div class="chat-input-wrap">
             <label title="PDF, image ou ZIP" style="flex-shrink:0;width:36px;height:36px;border-radius:9px;border:1px solid rgba(123,92,255,0.2);background:rgba(123,92,255,0.06);color:var(--t3);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px">
               📎<input type="file" id="chat-file" accept=".pdf,.zip,image/*" style="display:none">
@@ -390,6 +384,7 @@
       document.getElementById('sidebar-username').textContent = clientName
       document.getElementById('sidebar-avatar').textContent = clientName.charAt(0).toUpperCase()
       sendWelcome()
+      openAgentTab('diane')
       refreshUnreadBadge()
       var voiceToggle = document.getElementById('nyxia-voice-toggle')
       if (voiceToggle) voiceToggle.style.display = 'flex'
@@ -831,7 +826,7 @@
         if (chatHistories[requestAgent].length > 20) chatHistories[requestAgent] = chatHistories[requestAgent].slice(-20)
         // Lecture automatique : toujours pour les Alphas (OpenAI, coût minime),
         // seulement si activé pour NyXia (ElevenLabs, forfait mensuel).
-        var shouldAutoPlay = (requestAgent !== 'nyxia') || _nyxiaVoiceAuto
+        var shouldAutoPlay = true
         if (shouldAutoPlay) {
           var msgsEl = document.getElementById('chat-messages-' + requestAgent)
           var lastBotMsg = msgsEl ? msgsEl.querySelector('.msg.bot:last-child') : null
