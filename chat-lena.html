@@ -93,6 +93,7 @@
   var history = [];
   var lastUserMessage = null;
   var currentAudio = null;
+  var sending = false;
 
   (function(){
     if(!token){ location.replace('/login.html'); return; }
@@ -192,6 +193,7 @@
   function rmTyping(){ var t=el('typing'); if(t) t.remove(); }
 
   function send(){
+    if(sending) return;
     var text=el('input').value.trim(); if(!text) return;
     el('input').value=''; el('input').style.height='auto';
     addUser(text); history.push({role:'user',content:text}); lastUserMessage=text;
@@ -206,16 +208,16 @@
   }
 
   function callApi(){
-    el('send').disabled=true; addTyping();
+    sending=true; el('send').disabled=true; addTyping();
     fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({message:lastUserMessage, history:history.slice(-10), userName:userName, agent:AGENT.code, attachment:null, token:token})})
+      body:JSON.stringify({message:lastUserMessage, history:history.slice(0,-1).slice(-10), userName:userName, agent:AGENT.code, attachment:null, token:token})})
       .then(function(r){return r.json()}).then(function(d){
         rmTyping();
         var reply=d.content||'Petite interruption... réessaie dans un instant 💜';
         addBot(reply); history.push({role:'assistant',content:reply});
         if(history.length>20) history=history.slice(-20);
-        el('send').disabled=false;
-      }).catch(function(){ rmTyping(); addBot('Petite interruption... réessaie dans un instant 💜'); el('send').disabled=false; });
+        sending=false; el('send').disabled=false;
+      }).catch(function(){ rmTyping(); addBot('Petite interruption... réessaie dans un instant 💜'); sending=false; el('send').disabled=false; });
   }
 
   // ── Voix (Éric répond à voix haute) ──
