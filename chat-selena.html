@@ -210,7 +210,7 @@
   function callApi(){
     sending=true; el('send').disabled=true; addTyping();
     fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({message:lastUserMessage, history:history.slice(0,-1).slice(-10), userName:userName, agent:AGENT.code, attachment:null, token:token})})
+      body:JSON.stringify({message:lastUserMessage, history:history.slice(-10), userName:userName, agent:AGENT.code, attachment:null, token:token})})
       .then(function(r){return r.json()}).then(function(d){
         rmTyping();
         var reply=d.content||'Petite interruption... réessaie dans un instant 💜';
@@ -227,14 +227,12 @@
     if(currentAudio){ try{currentAudio.pause();}catch(e){} currentAudio=null; }
     if(btn) btn.textContent='⏳';
     fetch('/api/tts/nyxia',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:token,text:clean,agent:AGENT.code})})
-      .then(function(r){ if(!r.ok) return r.json().then(function(e){throw new Error(e.error||('HTTP '+r.status));}); return r.arrayBuffer(); })
-      .then(function(buf){
-        var blob=new Blob([buf],{type:'audio/mpeg'}); var url=URL.createObjectURL(blob);
-        currentAudio=new Audio(url); currentAudio.play();
-        if(btn) btn.textContent='🔊 Écouter';
-        currentAudio.onended=function(){ URL.revokeObjectURL(url); };
+      .then(function(r){ return r.json(); })
+      .then(function(data){
+        if(data && data.proxyUrl){ currentAudio=new Audio(data.proxyUrl); currentAudio.play(); if(btn) btn.textContent='🔊 Écouter'; }
+        else { if(btn){ btn.title=(data&&data.error)||''; btn.textContent='⚠️ Voix indispo'; setTimeout(function(){btn.textContent='🔊 Écouter';},2500);} }
       })
-      .catch(function(err){ if(btn){ btn.title=err.message; btn.textContent='⚠️ Voix indispo'; setTimeout(function(){btn.textContent='🔊 Écouter';},2500);} });
+      .catch(function(){ if(btn){ btn.textContent='⚠️ Voix indispo'; setTimeout(function(){btn.textContent='🔊 Écouter';},2500);} });
   }
 
   // ── PDF de la réponse ──
