@@ -120,7 +120,7 @@
         document.addEventListener('click',go); document.addEventListener('keydown',go); document.addEventListener('touchstart',go);
       });
     }
-    if(AGENT.greeting) addBot(AGENT.greeting);
+    if(AGENT.greeting) addBot(AGENT.greeting, false);
     el('send').addEventListener('click', function(){ send(); });
     el('input').addEventListener('keydown', function(e){ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); send(); } });
     el('input').addEventListener('input', function(){ this.style.height='auto'; this.style.height=Math.min(this.scrollHeight,120)+'px'; });
@@ -144,7 +144,7 @@
 
   function mkBtn(label, fn){ var b=document.createElement('button'); b.textContent=label; b.onclick=fn; return b; }
 
-  function addBot(raw){
+  function addBot(raw, autoSpeak){
     var m=document.createElement('div'); m.className='msg';
     m.innerHTML='<img class="av" src="'+esc(AGENT.avatar)+'">';
     var col=document.createElement('div'); col.className='col';
@@ -174,7 +174,7 @@
 
     var textForTools = display || raw;
     var actions=document.createElement('div'); actions.className='actions';
-    var sp=mkBtn('🔊 Écouter', function(){ speak(textForTools, sp); });
+    var sp=mkBtn('🔊 Écouter', function(){ speakMsg(sp, textForTools); });
     var cp=mkBtn('📋 Copier', function(){ navigator.clipboard.writeText(textForTools); cp.textContent='✓ Copié'; setTimeout(function(){cp.textContent='📋 Copier';},1500); });
     var rt=mkBtn('↺ Réessayer', function(){ retry(m); });
     var pd=mkBtn('⬇ PDF', function(){ toPdf(textForTools); });
@@ -182,7 +182,7 @@
     col.appendChild(actions);
 
     m.appendChild(col); el('msgs').appendChild(m); scroll();
-    speak(textForTools, sp); // Éric répond à voix haute automatiquement
+    if(autoSpeak) speakMsg(sp, textForTools); // Éric répond à voix haute automatiquement
   }
 
   function addTyping(){
@@ -214,25 +214,46 @@
       .then(function(r){return r.json()}).then(function(d){
         rmTyping();
         var reply=d.content||'Petite interruption... réessaie dans un instant 💜';
-        addBot(reply); history.push({role:'assistant',content:reply});
+        addBot(reply, true); history.push({role:'assistant',content:reply});
         if(history.length>20) history=history.slice(-20);
         sending=false; el('send').disabled=false;
       }).catch(function(){ rmTyping(); addBot('Petite interruption... réessaie dans un instant 💜'); sending=false; el('send').disabled=false; });
   }
 
   // ── Voix (Éric répond à voix haute) ──
-  function speak(text, btn){
-    var clean=(text||'').replace(/[#*_`>]/g,'').replace(/\[[^\]]*\]/g,'').trim();
-    if(!clean) return;
-    if(currentAudio){ try{currentAudio.pause();}catch(e){} currentAudio=null; }
-    if(btn) btn.textContent='⏳';
-    fetch('/api/tts/nyxia',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:token,text:clean,agent:AGENT.code})})
+  var sessionToken = token;
+  var _currentAgent = AGENT.code;
+
+  function cleanForSpeech(str){
+    return (str||'')
+      .replace(/\*\*(.*?)\*\*/g,'$1').replace(/\*(.*?)\*/g,'$1')
+      .replace(/---+/g,'').replace(/#{1,6}\s+/g,'').replace(/^>+\s*/gm,'')
+      .replace(/\[IMAGE[\s\S]*?\]/gi,'').replace(/\[PARCHEMIN\][\s\S]*?\[\/PARCHEMIN\]/gi,'')
+      .replace(/[✦💜🚀💎🌐📱⭐✓►▶🪞🌿🕯️🌙✨📖🔥👑😉📚📜]/gu,'').trim();
+  }
+
+  function stopSpeakBtn(btn){
+    btn._nxSpeaking=false; btn.textContent='🔊 Écouter';
+    if(btn._nxAudio){ try{btn._nxAudio.pause();}catch(e){} btn._nxAudio=null; }
+  }
+
+  function speakMsg(btn, text){
+    if(btn._nxSpeaking){ stopSpeakBtn(btn); return; }
+    document.querySelectorAll('.actions button').forEach(function(b){ if(b._nxSpeaking) stopSpeakBtn(b); });
+    speakViaHeyGen(btn, text, _currentAgent);
+  }
+
+  function speakViaHeyGen(btn, text, agentKey){
+    var clean=cleanForSpeech(text); if(!clean) return;
+    btn._nxSpeaking=true; btn.textContent='⏳ Un instant...';
+    fetch('/api/tts/nyxia',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:sessionToken,text:clean,agent:agentKey})})
       .then(function(r){ return r.json(); })
       .then(function(data){
-        if(data && data.proxyUrl){ currentAudio=new Audio(data.proxyUrl); currentAudio.play(); if(btn) btn.textContent='🔊 Écouter'; }
-        else { if(btn){ btn.title=(data&&data.error)||''; btn.textContent='⚠️ Voix indispo'; setTimeout(function(){btn.textContent='🔊 Écouter';},2500);} }
+        if(!data.success || !data.proxyUrl) throw new Error(data.error||'Pas de voix pour cet agent');
+        var audio=new Audio(data.proxyUrl); btn._nxAudio=audio; btn.textContent='⏹ Arrêter'; audio.play();
+        audio.onended=audio.onerror=function(){ stopSpeakBtn(btn); };
       })
-      .catch(function(){ if(btn){ btn.textContent='⚠️ Voix indispo'; setTimeout(function(){btn.textContent='🔊 Écouter';},2500);} });
+      .catch(function(err){ btn.title=err.message; btn.textContent='⚠️ Voix indisponible'; setTimeout(function(){ stopSpeakBtn(btn); },2500); });
   }
 
   // ── PDF de la réponse ──
