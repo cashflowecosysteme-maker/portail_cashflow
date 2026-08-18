@@ -226,10 +226,18 @@
 
   function cleanForSpeech(str){
     return (str||'')
-      .replace(/\*\*(.*?)\*\*/g,'$1').replace(/\*(.*?)\*/g,'$1')
-      .replace(/---+/g,'').replace(/#{1,6}\s+/g,'').replace(/^>+\s*/gm,'')
-      .replace(/\[IMAGE[\s\S]*?\]/gi,'').replace(/\[PARCHEMIN\][\s\S]*?\[\/PARCHEMIN\]/gi,'')
-      .replace(/[✦💜🚀💎🌐📱⭐✓►▶🪞🌿🕯️🌙✨📖🔥👑😉📚📜]/gu,'').trim();
+      .replace(/\*\*(.*?)\*\*/g,'$1')
+      .replace(/\*(.*?)\*/g,'$1')
+      .replace(/---+/g,'')
+      .replace(/#{1,6}\s+/g,'')
+      .replace(/^>+\s*/gm,'')
+      .replace(/\[IMAGE[\s\S]*?\]/gi,'')
+      .replace(/\[PARCHEMIN\][\s\S]*?\[\/PARCHEMIN\]/gi,'')
+      .replace(/[✦💜🚀💎🌐📱⭐✓►▶🪞🌿🕯️🌙✨📖🔥👑😉📚📜]/gu,'')
+      .replace(/<br>/g,' ')
+      .replace(/<[^>]+>/g,'')
+      .replace(/`([^`]+)`/g,'$1')
+      .trim();
   }
 
   function stopSpeakBtn(btn){
@@ -238,11 +246,14 @@
   }
 
   function speakMsg(btn, text){
-    if(btn._nxSpeaking){ stopSpeakBtn(btn); return; }
+    if(btn._nxSpeaking){ window.speechSynthesis && window.speechSynthesis.cancel(); stopSpeakBtn(btn); return; }
+    window.speechSynthesis && window.speechSynthesis.cancel();
     document.querySelectorAll('.actions button').forEach(function(b){ if(b._nxSpeaking) stopSpeakBtn(b); });
     speakViaHeyGen(btn, text, _currentAgent);
   }
 
+  // Voix serveur du personnage actif via le Worker : Éric = OpenAI (echo).
+  // Aucun repli navigateur — on préserve l'identité sonore de la marque (règle NyXia).
   function speakViaHeyGen(btn, text, agentKey){
     var clean=cleanForSpeech(text); if(!clean) return;
     btn._nxSpeaking=true; btn.textContent='⏳ Un instant...';
@@ -250,10 +261,11 @@
       .then(function(r){ return r.json(); })
       .then(function(data){
         if(!data.success || !data.proxyUrl) throw new Error(data.error||'Pas de voix pour cet agent');
-        var audio=new Audio(data.proxyUrl); btn._nxAudio=audio; btn.textContent='⏹ Arrêter'; audio.play();
+        var audio=new Audio(data.proxyUrl); btn._nxAudio=audio; btn.textContent='⏹ Arrêter';
+        audio.play();
         audio.onended=audio.onerror=function(){ stopSpeakBtn(btn); };
       })
-      .catch(function(err){ btn.title=err.message; btn.textContent='⚠️ Voix indisponible'; setTimeout(function(){ stopSpeakBtn(btn); },2500); });
+      .catch(function(err){ console.error('🔊 Voix ('+agentKey+') : '+err.message); btn.title=err.message; btn.textContent='⚠️ Voix indisponible'; setTimeout(function(){ stopSpeakBtn(btn); },2500); });
   }
 
   // ── PDF de la réponse ──
