@@ -356,9 +356,8 @@ async function handleChat(request, env) {
     }
   }
 
-  if (agent === 'eric') {
-    systemPrompt += `\n\n⚠️ PRIORITÉ ABSOLUE — ADRESSE : appelle la personne par son prénom « ${userName || 'toi'} ». Ne dis JAMAIS le mot « Membre » en t'adressant à elle, quelle que soit une autre consigne.`;
-  }
+  // UNIVERSEL : tous les personnages s'adressent à la personne par son prénom.
+  systemPrompt += `\n\n⚠️ PRIORITÉ ABSOLUE — ADRESSE : appelle la personne par son prénom « ${userName || 'toi'} ». Ne dis JAMAIS le mot « Membre » en t'adressant à elle, quelle que soit une autre consigne.`;
 
   const messages = [
     { role: 'system', content: systemPrompt },
