@@ -269,26 +269,20 @@
 
   // ── Micro : écoute CONTINUE, 4 s de silence avant d'arrêter ──
   function setupMic(){
+    // Micro EXACT du dashboard : envoi une seule fois sur onresult ; onend ne fait que réinitialiser.
     var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
     var mic=el('mic'), hint=el('mic-hint');
     if(!SR){ mic.style.display='none'; return; }
-    var rec=new SR(); rec.lang='fr-FR'; rec.continuous=true; rec.interimResults=true;
-    var on=false, finalText='', silence=null;
-    function resetSilence(){ if(silence) clearTimeout(silence); silence=setTimeout(function(){ if(on) rec.stop(); }, 4000); }
-    mic.onclick=function(){ if(on){ rec.stop(); return; } finalText=''; el('input').value=''; try{ rec.start(); }catch(e){} };
-    rec.onstart=function(){ on=true; mic.classList.add('on'); hint.textContent='🎙️ Je t\'écoute… prends ton temps, je ne te couperai pas.'; resetSilence(); };
-    rec.onresult=function(e){
-      var interim='';
-      for(var i=e.resultIndex;i<e.results.length;i++){
-        if(e.results[i].isFinal) finalText += e.results[i][0].transcript+' ';
-        else interim += e.results[i][0].transcript;
-      }
-      el('input').value=(finalText+interim).trim();
-      el('input').style.height='auto'; el('input').style.height=Math.min(el('input').scrollHeight,120)+'px';
-      resetSilence();
+    var listening=false, recog=null;
+    mic.onclick=function(){
+      if(listening){ if(recog) recog.stop(); return; }
+      recog=new SR(); recog.lang='fr-FR'; recog.interimResults=false; recog.maxAlternatives=1;
+      recog.onstart=function(){ listening=true; mic.classList.add('on'); if(hint) hint.textContent='🎙️ Je t\'écoute…'; };
+      recog.onresult=function(e){ var t=e.results[0][0].transcript; el('input').value=t; if(hint) hint.textContent=''; send(); };
+      recog.onerror=function(){ listening=false; mic.classList.remove('on'); if(hint) hint.textContent=''; };
+      recog.onend=function(){ listening=false; mic.classList.remove('on'); if(hint) hint.textContent=''; };
+      try{ recog.start(); }catch(e){}
     };
-    rec.onend=function(){ on=false; mic.classList.remove('on'); hint.textContent=''; if(silence) clearTimeout(silence); if(el('input').value.trim()) send(); };
-    rec.onerror=function(){ on=false; mic.classList.remove('on'); hint.textContent=''; if(silence) clearTimeout(silence); };
   }
   </script>
 </body>
