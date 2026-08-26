@@ -87,6 +87,12 @@
     </div>
 
     <div class="chat-messages active-chat" id="chat-messages-eric"></div>
+    <div id="formation-launch-wrap" style="display:none;padding:8px 24px 0;flex-shrink:0">
+      <button type="button" id="formation-launch" onclick="foLaunch()"
+        style="width:100%;border:none;border-radius:13px;padding:12px 16px;cursor:pointer;font-family:inherit;font-size:14px;font-weight:700;color:#fff;background:linear-gradient(135deg,#7B5CFF,#5B3FD6);box-shadow:0 8px 22px rgba(123,92,255,0.35)">
+        ✨ Commencer ma formation
+      </button>
+    </div>
     <div class="suggestions" id="suggestions" style="display:none"></div>
 
     <div id="attach-bar" style="display:none;padding:6px 20px;background:rgba(123,92,255,0.08);border-top:1px solid rgba(123,92,255,0.1);align-items:center;gap:8px;flex-shrink:0;font-size:12px;color:var(--t3)">
@@ -168,6 +174,7 @@
     var videoUrl = AGENT_WELCOME_VIDEO.eric
     if (videoUrl) addVideoMessage(videoUrl, 'eric')
     addBotMessage(ALPHA_INFO.eric.greeting)
+    foRefreshLaunchButton()
 
     // Listeners de l'input
     var chatInput = document.getElementById('chat-input')
@@ -261,6 +268,7 @@
       addBotMessage(reply)
       chatHistories[requestAgent].push({ role: 'assistant', content: reply })
       if (chatHistories[requestAgent].length > 20) chatHistories[requestAgent] = chatHistories[requestAgent].slice(-20)
+      foRefreshLaunchButton()
       // Lecture automatique : Éric répond à voix haute (OpenAI echo, coût minime).
       var msgsEl = document.getElementById('chat-messages-' + requestAgent)
       var lastBotMsg = msgsEl ? msgsEl.querySelector('.msg.bot:last-child') : null
@@ -271,6 +279,32 @@
       btn.disabled = false
     })
     .catch(function(){ removeTyping(); addBotMessage('Petite interruption... réessaie dans un instant 💜'); btn.disabled = false })
+  }
+
+  // 🎓 Bouton « Commencer / Continuer ma formation » — déclenche la même mécanique que la saisie naturelle.
+  var _foHasProgress = false
+  function foRefreshLaunchButton() {
+    if (!sessionToken) return
+    fetch('/api/formation/list', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: sessionToken, agent: _currentAgent })
+    })
+    .then(function(r){ return r.json() })
+    .then(function(data) {
+      var formations = (data && data.formations) || []
+      var wrap = document.getElementById('formation-launch-wrap')
+      var btn = document.getElementById('formation-launch')
+      if (!wrap || !btn) return
+      if (!formations.length) { wrap.style.display = 'none'; return }
+      _foHasProgress = formations.some(function(f) { return f.progress && (f.progress.moduleId || f.progress.moduleNumero != null) })
+      btn.textContent = _foHasProgress ? '▸ Continuer ma formation' : '✨ Commencer ma formation'
+      wrap.style.display = 'block'
+    })
+    .catch(function(){ /* pas de bouton si l'appel échoue : le chat reste pleinement utilisable */ })
+  }
+  function foLaunch() {
+    sendMessageText(_foHasProgress ? 'continue ma formation' : 'commence ma formation')
+    setTimeout(foRefreshLaunchButton, 1200)
   }
 
   /* ═══════ MESSAGES & IMAGES ═══════ */
@@ -287,18 +321,35 @@
     var parchMatch = text.match(parchRegex)
     var parchImgRegex = /\[PARCHEMIN_IMAGE\s*:\s*([\s\S]*?)\]/i
     var parchImgMatch = text.match(parchImgRegex)
-    var textWithoutImg = text.replace(imgRegex, '').replace(parchRegex, '').replace(parchImgRegex, '').trim()
+
+    var videoRegex = /\[VIDEO\s*:\s*([^\]\r\n]+)\]/i
+    var videoMatch = text.match(videoRegex)
+    var audioUrls = [], photoUrls = [], mm
+    var audioRegexG = /\[AUDIO\s*:\s*([^\]\r\n]+)\]/gi
+    while ((mm = audioRegexG.exec(text)) !== null) { var au = safeLivingVideoUrl(mm[1]); if (au) audioUrls.push(au) }
+    var photoRegexG = /\[PHOTO\s*:\s*([^\]\r\n]+)\]/gi
+    while ((mm = photoRegexG.exec(text)) !== null) { var pu = safeLivingVideoUrl(mm[1]); if (pu) photoUrls.push(pu) }
+
+    var textWithoutImg = text.replace(imgRegex, '').replace(parchRegex, '').replace(parchImgRegex, '').replace(videoRegex, '')
+      .replace(/\[AUDIO\s*:\s*[^\]\r\n]+\]/gi, '').replace(/\[PHOTO\s*:\s*[^\]\r\n]+\]/gi, '').trim()
     var imgDesc = imgMatch ? imgMatch[1].trim() : null
     var parchContent = parchMatch ? parchMatch[1].trim() : null
     var parchImgUrl = parchImgMatch ? parchImgMatch[1].trim() : null
+    var videoUrl = videoMatch ? safeLivingVideoUrl(videoMatch[1]) : ''
 
     var bubble = document.createElement('div'); bubble.className = 'msg-bubble'
     if (textWithoutImg) {
       bubble.innerHTML = cleanMarkdown(escHtml(textWithoutImg)).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>')
-    } else if (!imgDesc && !parchContent) {
+    } else if (!imgDesc && !parchContent && !videoMatch && !audioUrls.length && !photoUrls.length) {
       bubble.innerHTML = cleanMarkdown(escHtml(text)).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>')
+    } else {
+      bubble.style.display = 'none'
     }
     wrapper.appendChild(bubble)
+
+    if (videoUrl) appendLivingVideo(wrapper, videoUrl)
+    audioUrls.forEach(function(u) { appendLivingAudio(wrapper, u) })
+    photoUrls.forEach(function(u) { appendLivingPhoto(wrapper, u) })
 
     // Carte de parchemin — séparée du texte, avec un bouton Copier qui ne prend QUE
     // le contenu publiable (jamais les mots d'Éric autour).
@@ -538,6 +589,152 @@
       .trim()
   }
 
+  function safeLivingVideoUrl(rawUrl) {
+    try {
+      var parsed = new URL(String(rawUrl || '').trim(), window.location.href)
+      return parsed.protocol === 'https:' ? parsed.href : ''
+    } catch (e) { return '' }
+  }
+  function livingVideoEmbedUrl(rawUrl) {
+    try {
+      var parsed = new URL(rawUrl)
+      var host = parsed.hostname.toLowerCase().replace(/^www\./, '')
+      var videoId = ''
+
+      if (host === 'youtu.be') videoId = parsed.pathname.split('/').filter(Boolean)[0] || ''
+      if (host === 'youtube.com' || host === 'youtube-nocookie.com') {
+        videoId = parsed.searchParams.get('v') || ''
+        if (!videoId) {
+          var youtubeParts = parsed.pathname.split('/').filter(Boolean)
+          if (youtubeParts[0] === 'embed' || youtubeParts[0] === 'shorts') videoId = youtubeParts[1] || ''
+        }
+      }
+      if (/^[A-Za-z0-9_-]{6,}$/.test(videoId)) {
+        return 'https://www.youtube-nocookie.com/embed/' + videoId
+      }
+
+      if (host === 'vimeo.com' || host === 'player.vimeo.com') {
+        var vimeoMatch = parsed.pathname.match(/(?:video\/)?(\d+)/)
+        if (vimeoMatch) return 'https://player.vimeo.com/video/' + vimeoMatch[1]
+      }
+
+      if (host === 'iframe.videodelivery.net') return parsed.href
+      if (host === 'watch.cloudflarestream.com') {
+        var streamId = parsed.pathname.split('/').filter(Boolean)[0] || ''
+        if (/^[A-Za-z0-9_-]+$/.test(streamId)) return 'https://iframe.videodelivery.net/' + streamId
+      }
+    } catch (e) {}
+    return ''
+  }
+  function appendLivingVideo(wrapper, videoUrl) {
+    var card = document.createElement('div')
+    card.style.cssText = 'width:min(100%,560px);margin-top:6px;padding:10px;border-radius:16px;border:1px solid rgba(123,92,255,0.22);background:linear-gradient(145deg,rgba(123,92,255,0.09),rgba(255,255,255,0.025));box-shadow:0 12px 30px rgba(20,12,48,0.16)'
+
+    var label = document.createElement('div')
+    label.textContent = '🎬 Formation vivante'
+    label.style.cssText = 'font-size:12px;font-weight:700;color:#c4b5fd;letter-spacing:.02em;margin:1px 2px 9px'
+    card.appendChild(label)
+
+    var frame = document.createElement('div')
+    frame.style.cssText = 'position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;border-radius:11px;background:#070713'
+    var embedUrl = livingVideoEmbedUrl(videoUrl)
+
+    if (embedUrl) {
+      var iframe = document.createElement('iframe')
+      iframe.src = embedUrl
+      iframe.title = 'Vidéo de formation'
+      iframe.loading = 'lazy'
+      iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share'
+      iframe.allowFullscreen = true
+      iframe.referrerPolicy = 'strict-origin-when-cross-origin'
+      iframe.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;border:0'
+      frame.appendChild(iframe)
+    } else {
+      var video = document.createElement('video')
+      video.src = videoUrl
+      video.controls = true
+      video.playsInline = true
+      video.preload = 'metadata'
+      video.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#070713'
+      frame.appendChild(video)
+    }
+
+    card.appendChild(frame)
+    wrapper.appendChild(card)
+  }
+  function appendLivingAudio(wrapper, audioUrl, meta) {
+    meta = meta || {}
+    var card = document.createElement('div')
+    card.style.cssText = 'width:min(100%,460px);margin-top:6px;padding:12px 14px;border-radius:16px;border:1px solid rgba(123,92,255,0.22);background:linear-gradient(145deg,rgba(123,92,255,0.09),rgba(255,255,255,0.025));box-shadow:0 12px 30px rgba(20,12,48,0.16)'
+
+    var label = document.createElement('div')
+    label.textContent = '🎧 ' + (meta.title || 'Audio de formation')
+    label.style.cssText = 'font-size:12px;font-weight:700;color:#c4b5fd;letter-spacing:.02em;margin:0 2px 10px'
+    card.appendChild(label)
+
+    var audio = document.createElement('audio')
+    audio.src = audioUrl
+    audio.preload = 'metadata'
+    audio.style.display = 'none'
+    card.appendChild(audio)
+
+    var row = document.createElement('div')
+    row.style.cssText = 'display:flex;align-items:center;gap:11px'
+
+    var playBtn = document.createElement('button')
+    playBtn.type = 'button'
+    playBtn.innerHTML = '▶'
+    playBtn.setAttribute('aria-label', 'Lecture')
+    playBtn.style.cssText = 'flex-shrink:0;width:40px;height:40px;border-radius:50%;border:1px solid rgba(123,92,255,0.35);background:rgba(123,92,255,0.14);color:#e9e2ff;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center'
+
+    var mid = document.createElement('div')
+    mid.style.cssText = 'flex:1;display:flex;flex-direction:column;gap:5px;min-width:0'
+
+    var range = document.createElement('input')
+    range.type = 'range'; range.min = 0; range.max = 1000; range.value = 0
+    range.style.cssText = 'width:100%;accent-color:#7B5CFF;cursor:pointer'
+
+    var time = document.createElement('div')
+    time.style.cssText = 'display:flex;justify-content:space-between;font-size:11px;color:var(--t3);font-variant-numeric:tabular-nums'
+    var cur = document.createElement('span'); cur.textContent = '0:00'
+    var dur = document.createElement('span'); dur.textContent = '--:--'
+    time.appendChild(cur); time.appendChild(dur)
+
+    mid.appendChild(range); mid.appendChild(time)
+    row.appendChild(playBtn); row.appendChild(mid)
+    card.appendChild(row)
+    wrapper.appendChild(card)
+
+    function fmt(t) { if (!isFinite(t)) return '--:--'; t = Math.max(0, Math.floor(t)); var m = Math.floor(t / 60), s = t % 60; return m + ':' + (s < 10 ? '0' : '') + s }
+    var seeking = false
+    audio.addEventListener('loadedmetadata', function() { dur.textContent = fmt(audio.duration) })
+    audio.addEventListener('timeupdate', function() {
+      if (seeking) return
+      cur.textContent = fmt(audio.currentTime)
+      if (audio.duration) range.value = Math.round((audio.currentTime / audio.duration) * 1000)
+    })
+    audio.addEventListener('ended', function() { playBtn.innerHTML = '▶'; playBtn.setAttribute('aria-label', 'Lecture'); range.value = 0; cur.textContent = '0:00' })
+    audio.addEventListener('error', function() { label.textContent = '🎧 Audio momentanément indisponible' })
+    playBtn.addEventListener('click', function() {
+      if (audio.paused) { audio.play().then(function() { playBtn.innerHTML = '⏸'; playBtn.setAttribute('aria-label', 'Pause') }).catch(function() {}) }
+      else { audio.pause(); playBtn.innerHTML = '▶'; playBtn.setAttribute('aria-label', 'Lecture') }
+    })
+    range.addEventListener('input', function() { seeking = true; if (audio.duration) cur.textContent = fmt((range.value / 1000) * audio.duration) })
+    range.addEventListener('change', function() { if (audio.duration) audio.currentTime = (range.value / 1000) * audio.duration; seeking = false })
+  }
+  function appendLivingPhoto(wrapper, photoUrl) {
+    var card = document.createElement('div')
+    card.style.cssText = 'width:min(100%,460px);margin-top:6px;border-radius:14px;overflow:hidden;border:1px solid rgba(123,92,255,0.18);background:rgba(123,92,255,0.05)'
+    var img = document.createElement('img')
+    img.src = photoUrl
+    img.alt = 'Image de formation'
+    img.loading = 'lazy'
+    img.style.cssText = 'width:100%;display:block;max-height:420px;object-fit:contain;background:#070713'
+    img.onerror = function() { card.style.display = 'none' }
+    card.appendChild(img)
+    wrapper.appendChild(card)
+  }
+
   function cleanForSpeech(str) {
     return str
       .replace(/\*\*(.*?)\*\*/g, '$1')
@@ -548,6 +745,9 @@
       .replace(/\[IMAGE[\s\S]*?\]/gi, '')
       .replace(/\[PARCHEMIN\][\s\S]*?\[\/PARCHEMIN\]/gi, '')
       .replace(/\[PARCHEMIN_IMAGE[\s\S]*?\]/gi, '')
+      .replace(/\[VIDEO\s*:\s*[^\]\r\n]+\]/gi, '')
+      .replace(/\[AUDIO\s*:\s*[^\]\r\n]+\]/gi, '')
+      .replace(/\[PHOTO\s*:\s*[^\]\r\n]+\]/gi, '')
       .replace(/[✦💜🚀💎🌐📱⭐✓►▶🪞🌿🕯️🌙✨📖🔥👑😉📚📜]/gu, '')
       .replace(/<br>/g, ' ')
       .replace(/<[^>]+>/g, '')
