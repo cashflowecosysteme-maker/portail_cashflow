@@ -217,6 +217,11 @@ export default {
       if (path === '/api/logout' && request.method === 'POST') return await handleLogout(request, env);
       if (path === '/api/chat' && request.method === 'POST') return await handleChat(request, env);
 
+      // ── Formation Vivante (lecture côté membre + progression) ──
+      if (path === '/api/formation/list' && request.method === 'POST') return await handleFormationList(request, env);
+      if (path === '/api/formation/module' && request.method === 'POST') return await handleFormationModule(request, env);
+      if (path === '/api/formation/progress' && request.method === 'POST') return await handleFormationProgressRoute(request, env);
+
       // ── Ingestion des livres Markdown dans Vectorize (Sécurisé Admin) ──
       if (path === '/api/ingest-book' && request.method === 'POST') return await handleIngestBook(request, env);
       if (path === '/api/admin/clear-brain' && request.method === 'POST') return await handleClearBrain(request, env);
@@ -292,6 +297,533 @@ async function handleLogout(request, env) {
 
 // ───────────── CHAT (NyXia + Alphas) ─────────────
 
+// ═══════════ FORMATION VIVANTE (porté depuis le Portail Alex — générique par personnage) ═══════════
+
+const LIVING_VIDEO_TRAINING_PROTOCOL = `
+
+🎬 FORMATION VIVANTE VIDÉO — PROTOCOLE UNIVERSEL
+
+Le contexte retrouvé contient une leçon vidéo approuvée par Diane. Tu peux l'intégrer à ta réponse UNIQUEMENT si elle répond directement à la demande actuelle ou constitue la prochaine petite étape logique de l'accompagnement.
+
+RÈGLES ABSOLUES :
+- Utilise seulement une adresse indiquée exactement après « ADRESSE VIDÉO APPROUVÉE » dans le contexte retrouvé.
+- N'invente, ne corrige, ne raccourcis et ne remplace jamais cette adresse.
+- Une seule vidéo au maximum par réponse.
+- Introduis-la naturellement en une ou deux phrases courtes, dans la voix de ton personnage.
+- Pour afficher la vidéo dans le portail, place ce marqueur exact sur sa propre ligne :
+
+[VIDEO: adresse_https_approuvée]
+
+- Le marqueur doit rester intact. Ne le mets pas dans un bloc de code et ne l'explique jamais au Membre.
+- Après la vidéo, utilise la question d'intégration de la leçon si elle est pertinente, une seule question à la fois.
+- Si la vidéo n'est pas réellement utile maintenant, continue l'accompagnement sans l'afficher.
+- Si aucune adresse approuvée n'est présente, n'affiche aucune vidéo.`;
+
+const LIVING_AUDIO_TRAINING_PROTOCOL = `
+
+🎧 FORMATION VIVANTE AUDIO — PROTOCOLE UNIVERSEL
+
+Le contexte retrouvé peut contenir un audio MP3 approuvé par Diane. Tu peux l'intégrer UNIQUEMENT s'il répond à la demande actuelle ou constitue la prochaine petite étape logique.
+
+RÈGLES ABSOLUES :
+- Utilise seulement une adresse indiquée exactement après « ADRESSE AUDIO APPROUVÉE : » dans le contexte.
+- N'invente, ne corrige et ne remplace jamais cette adresse.
+- Introduis-le naturellement en une ou deux phrases courtes, dans ta voix.
+- Pour afficher le lecteur audio dans le portail, place ce marqueur exact sur sa propre ligne :
+
+[AUDIO: adresse_https_approuvée]
+
+- Le marqueur doit rester intact. Ne le mets pas dans un bloc de code et ne l'explique jamais.
+- Après l'audio, invite la personne à revenir vers toi pour appliquer la matière à son projet.
+- Si aucune adresse approuvée n'est présente, n'affiche aucun audio.`;
+
+const LIVING_TRAINING_PROTOCOL = `
+
+🎓 FORMATION VIVANTE — PROTOCOLE FORMATEUR
+
+Tu peux accompagner la personne dans une vraie formation structurée. Quand elles existent, une CARTE DES FORMATIONS et la progression de la personne te sont fournies plus haut, et parfois un MODULE ACTIF avec son contenu réel.
+
+QUAND LA PERSONNE VEUT SUIVRE LA FORMATION :
+- « Commence la formation » → démarre au Module 1 (demande laquelle s'il y a plusieurs formations).
+- « Je suis rendu au module 4 » / « reprends » → poursuis au bon module. Si une progression existe, propose d'abord de reprendre là où elle s'était arrêtée, puis laisse-la libre de choisir un autre module.
+- La personne peut toujours demander directement n'importe quel module.
+
+COMMENT TU ENSEIGNES (toujours, esprit TDAH) :
+- UN SEUL BLOC À LA FOIS. Jamais tout le module d'un coup.
+- Après chaque bloc, tu vérifies la compréhension et tu attends son feu vert avant d'avancer.
+- Tu relies chaque notion au PROPRE PROJET DE LIVRE de la personne — tu ne te contentes pas d'afficher le contenu, tu le fais vivre et appliquer.
+- Tu célèbres chaque petit pas.
+
+MÉDIAS D'UN MODULE (copie l'adresse EXACTE fournie dans le MODULE ACTIF) :
+- Bloc AUDIO → une phrase d'intro dans ta voix, puis sur sa propre ligne : [AUDIO: adresse_https_approuvée]
+- Bloc VIDÉO → [VIDEO: adresse_https_approuvée]
+- Bloc IMAGE réelle → [PHOTO: adresse_https_approuvée]
+- Un seul média par bloc. Après le média, invite la personne à revenir vers toi.
+
+RÈGLES :
+- N'invente JAMAIS un module, un contenu ou un exercice absent de la carte ou du module actif. Si un contenu n'existe pas encore, dis-le simplement et propose ce qui est disponible.
+- Reste dans ta voix d'Alex, chaleureux et vivant.`;
+
+function normalizeApprovedVideoUrl(rawUrl) {
+  try {
+    const parsed = new URL(String(rawUrl || '').trim());
+    return parsed.protocol === 'https:' ? parsed.href : '';
+  } catch (_) {
+    return '';
+  }
+}
+
+function extractApprovedLivingVideoUrls(brainContext) {
+  const urls = [];
+  const seen = new Set();
+  const source = String(brainContext || '');
+  const approvedUrlRegex = /ADRESSE\s+VID(?:É|E)O\s+APPROUV(?:É|E)E\s*:\s*(https:\/\/[^\s<>"'\[\]]+)/giu;
+  let match;
+
+  while ((match = approvedUrlRegex.exec(source)) !== null) {
+    const normalized = normalizeApprovedVideoUrl(match[1]);
+    if (normalized && !seen.has(normalized)) {
+      seen.add(normalized);
+      urls.push(normalized);
+    }
+  }
+
+  return urls;
+}
+
+function sanitizeLivingVideoMarkers(content, approvedUrls) {
+  const allowed = new Set((approvedUrls || []).map(normalizeApprovedVideoUrl).filter(Boolean));
+  let videoAlreadyUsed = false;
+
+  return String(content || '')
+    .replace(/\[VIDEO\s*:\s*([^\]\r\n]+)\]/giu, (_marker, rawUrl) => {
+      const normalized = normalizeApprovedVideoUrl(rawUrl);
+      if (!normalized || !allowed.has(normalized) || videoAlreadyUsed) return '';
+      videoAlreadyUsed = true;
+      return `[VIDEO: ${normalized}]`;
+    })
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function extractApprovedMediaUrls(source, label) {
+  const urls = [];
+  const seen = new Set();
+  const s = String(source || '');
+  const re = new RegExp(`ADRESSE\\s+${label}\\s+APPROUV(?:É|E)E\\s*:\\s*(https:\\/\\/[^\\s<>"'\\[\\]]+)`, 'giu');
+  let match;
+  while ((match = re.exec(s)) !== null) {
+    const normalized = normalizeApprovedVideoUrl(match[1]);
+    if (normalized && !seen.has(normalized)) {
+      seen.add(normalized);
+      urls.push(normalized);
+    }
+  }
+  return urls;
+}
+
+function sanitizeApprovedMediaMarkers(content, markerName, approvedUrls, max) {
+  const allowed = new Set((approvedUrls || []).map(normalizeApprovedVideoUrl).filter(Boolean));
+  let count = 0;
+  const limit = Number.isFinite(max) ? max : 3;
+  const re = new RegExp(`\\[${markerName}\\s*:\\s*([^\\]\\r\\n]+)\\]`, 'giu');
+  return String(content || '')
+    .replace(re, (_marker, rawUrl) => {
+      const normalized = normalizeApprovedVideoUrl(rawUrl);
+      if (!normalized || !allowed.has(normalized) || count >= limit) return '';
+      count++;
+      return `[${markerName}: ${normalized}]`;
+    })
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function formationDocKey(agent, id) { return `formation:${agent}:${id}`; }
+
+function formationProgressKey(email) { return `formation_progress:${String(email || '').toLowerCase()}`; }
+
+function normalizeFormationModules(formation) {
+  const mods = Array.isArray(formation && formation.modules) ? formation.modules : [];
+  return mods.map((m, i) => ({
+    id: (m && m.id) || `m${i + 1}`,
+    numero: Number.isFinite(m && m.numero) ? m.numero : (i + 1),
+    titre: (m && m.titre) || `Module ${i + 1}`,
+    blocs: Array.isArray(m && m.blocs) ? m.blocs : []
+  }));
+}
+
+async function listFormations(env, agent) {
+  const out = [];
+  try {
+    const list = await env.CASHFLOW_KV.list({ prefix: `formation:${agent}:` });
+    for (const k of list.keys) {
+      const raw = await env.CASHFLOW_KV.get(k.name);
+      if (!raw) continue;
+      let doc; try { doc = JSON.parse(raw); } catch (_) { continue; }
+      if (doc && doc.id) out.push(doc);
+    }
+  } catch (_) { /* KV indisponible : aucune formation */ }
+  out.sort((a, b) => (a.ordre || 0) - (b.ordre || 0) || String(a.titre || '').localeCompare(String(b.titre || '')));
+  return out;
+}
+
+async function getFormation(env, agent, id) {
+  if (!id) return null;
+  try {
+    const raw = await env.CASHFLOW_KV.get(formationDocKey(agent, id));
+    return raw ? JSON.parse(raw) : null;
+  } catch (_) { return null; }
+}
+
+function findFormationModule(formation, { moduleId, moduleNumero }) {
+  const mods = normalizeFormationModules(formation);
+  if (moduleId) { const f = mods.find(m => m.id === moduleId); if (f) return f; }
+  if (Number.isFinite(moduleNumero)) { const f = mods.find(m => m.numero === moduleNumero); if (f) return f; }
+  return null;
+}
+
+async function getFormationProgress(env, email) {
+  try {
+    const raw = await env.CASHFLOW_KV.get(formationProgressKey(email));
+    return raw ? JSON.parse(raw) : {};
+  } catch (_) { return {}; }
+}
+
+async function setFormationProgress(env, email, formationId, patch) {
+  if (!email || !formationId) return null;
+  const all = await getFormationProgress(env, email);
+  const prev = all[formationId] || {};
+  const completed = Array.isArray(prev.completed) ? prev.completed.slice() : [];
+  if (patch && patch.completedModuleId && !completed.includes(patch.completedModuleId)) {
+    completed.push(patch.completedModuleId);
+  }
+  all[formationId] = {
+    moduleId: patch && patch.moduleId != null ? patch.moduleId : (prev.moduleId || null),
+    moduleNumero: patch && patch.moduleNumero != null ? patch.moduleNumero : (prev.moduleNumero != null ? prev.moduleNumero : null),
+    blocIndex: patch && patch.blocIndex != null ? patch.blocIndex : (prev.blocIndex || 0),
+    completed,
+    updatedAt: new Date().toISOString()
+  };
+  try { await env.CASHFLOW_KV.put(formationProgressKey(email), JSON.stringify(all)); } catch (_) {}
+  return all[formationId];
+}
+
+function parseFormationIntent(message) {
+  const s = String(message || '').toLowerCase();
+  const wantsStart = /(commenc|d[ée]but|d[ée]marr)/.test(s) && /(formation|module|cours|le[çc]on)/.test(s)
+    || /(commence la formation|on commence|je commence)/.test(s);
+  const wantsResume = /(repren|reprend|continu|o[uù] j'en [ée]tais|l[àa] o[uù] j'|reprendre)/.test(s);
+  let moduleNumero = null;
+  const m = s.match(/module\s*(\d{1,3})/)
+    || s.match(/rendu\s+(?:au|[àa])\s*(?:module\s*)?(\d{1,3})/)
+    || s.match(/(?:le[çc]on|[ée]tape)\s*(\d{1,3})/);
+  if (m) moduleNumero = parseInt(m[1], 10);
+  const wantsFinishModule = /(termin[ée]|j'ai fini|c'est fait|compl[ée]t[ée]|j'ai fait le module)/.test(s);
+  return {
+    wantsStart, wantsResume, moduleNumero, wantsFinishModule,
+    isTraining: wantsStart || wantsResume || moduleNumero != null || wantsFinishModule
+  };
+}
+
+function resolveActiveFormation(formations, message) {
+  if (!formations.length) return null;
+  if (formations.length === 1) return formations[0];
+  const s = String(message || '').toLowerCase();
+  const byId = formations.find(f => f.id && s.includes(String(f.id).toLowerCase()));
+  if (byId) return byId;
+  const byTitle = formations.find(f => f.titre && f.titre.length > 4 && s.includes(String(f.titre).toLowerCase()));
+  return byTitle || null;
+}
+
+function buildFormationMap(formations, progressAll) {
+  if (!formations.length) return '';
+  const lines = ['🗺️ CARTE DES FORMATIONS DISPONIBLES (contenu réel approuvé par Diane — n\'invente jamais un module absent d\'ici) :'];
+  for (const f of formations) {
+    const mods = normalizeFormationModules(f);
+    lines.push(`\n📘 Formation « ${f.titre} » (id: ${f.id})${f.description ? ' — ' + f.description : ''}`);
+    if (!mods.length) { lines.push('  (aucun module encore disponible)'); }
+    else { for (const m of mods) lines.push(`  • Module ${m.numero} — ${m.titre}`); }
+    const p = progressAll && progressAll[f.id];
+    if (p) {
+      const done = Array.isArray(p.completed) ? p.completed.length : 0;
+      lines.push(`  ↳ Progression : module en cours = ${p.moduleNumero != null ? p.moduleNumero : '—'} ; modules complétés = ${done}.`);
+    } else {
+      lines.push('  ↳ Progression : formation pas encore commencée.');
+    }
+  }
+  return lines.join('\n');
+}
+
+function formationBlocToPromptLines(bloc, idx) {
+  const t = String((bloc && bloc.type) || 'texte').toLowerCase();
+  const n = idx + 1;
+  if (t === 'texte') return `BLOC ${n} — TEXTE\n${bloc.contenu || ''}`;
+  if (t === 'image') return `BLOC ${n} — IMAGE\n${bloc.legende ? 'Légende : ' + bloc.legende + '\n' : ''}ADRESSE IMAGE APPROUVÉE : ${bloc.url || ''}`;
+  if (t === 'audio') return `BLOC ${n} — AUDIO MP3\n${bloc.titre ? 'Titre : ' + bloc.titre + '\n' : ''}${bloc.intro ? 'Intro suggérée : ' + bloc.intro + '\n' : ''}ADRESSE AUDIO APPROUVÉE : ${bloc.url || ''}`;
+  if (t === 'video' || t === 'vidéo') return `BLOC ${n} — VIDÉO\n${bloc.titre ? 'Titre : ' + bloc.titre + '\n' : ''}${bloc.intro ? 'Intro suggérée : ' + bloc.intro + '\n' : ''}ADRESSE VIDÉO APPROUVÉE : ${bloc.url || ''}`;
+  if (t === 'exercice') return `BLOC ${n} — EXERCICE\n${bloc.objectif ? 'Objectif : ' + bloc.objectif + '\n' : ''}Consigne : ${bloc.consigne || bloc.contenu || ''}`;
+  if (t === 'intervention') return `BLOC ${n} — INTERVENTION D'ALEX (ce que tu dois dire/faire)\n${bloc.contenu || ''}`;
+  return `BLOC ${n} — ${t.toUpperCase()}\n${bloc.contenu || bloc.url || ''}`;
+}
+
+function buildActiveModuleInjection(formation, module) {
+  const blocs = Array.isArray(module.blocs) ? module.blocs : [];
+  const parts = [
+    `🎯 MODULE ACTIF — Formation « ${formation.titre} » · Module ${module.numero} : ${module.titre}`,
+    `Voici le contenu réel de ce module, dans l'ordre. Fais-le vivre UN BLOC À LA FOIS (jamais tout d'un coup), vérifie la compréhension entre chaque, et aide la personne à appliquer à SON livre. Pour un bloc média, copie l'adresse EXACTE après « ADRESSE … APPROUVÉE » dans le marqueur correspondant.`
+  ];
+  blocs.forEach((b, i) => parts.push('\n' + formationBlocToPromptLines(b, i)));
+  return parts.join('\n');
+}
+
+function isHttpsUrl(u) { return /^https:\/\//i.test(String(u || '').trim()); }
+
+function parseFormationControl(message) {
+  const s = String(message || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  let moduleNumero = null;
+  const m = s.match(/module\s*(\d{1,3})/)
+    || s.match(/rendu\s+(?:au|a)\s*(?:module\s*)?(\d{1,3})/)
+    || s.match(/(?:lecon|etape)\s*(\d{1,3})/);
+  if (m) moduleNumero = parseInt(m[1], 10);
+
+  const hasFormationWord = /(formation|module|cours|lecon|etape)/.test(s);
+  const restart = /(recommenc|depuis le debut|repartir a zero|tout reprendre depuis)/.test(s);
+  const resume = /(continue ma formation|continuer ma formation|reprend|reprends|reprendre|ou j'?en etais|la ou j)/.test(s);
+  const advance = /(la suite|(^|\s)suite(\s|$|\.|!|\?)|suivant|prochain|prochaine etape|etape suivante|on avance|je suis pret|je suis prete|on continue|continuons|next)/.test(s);
+  const start = /(commenc|debut|demarr)/.test(s) && (hasFormationWord || /(ma formation|la formation|le cours)/.test(s));
+
+  let action = null;
+  if (moduleNumero != null) action = 'module';
+  else if (restart) action = 'restart';
+  else if (resume) action = 'resume';
+  else if (advance) action = 'advance';
+  else if (start) action = 'start';
+  return { action, moduleNumero };
+}
+
+function pickLatestProgressFormation(formations, progressAll) {
+  let best = null, bestTime = -1;
+  for (const f of formations) {
+    const p = progressAll && progressAll[f.id];
+    if (!p) continue;
+    const t = Date.parse(p.updatedAt || '') || 0;
+    if (t >= bestTime) { bestTime = t; best = f; }
+  }
+  return best;
+}
+
+function formationNavHint(isLastOfModule, isLastOfFormation) {
+  if (isLastOfFormation) return '— Tu arrives au bout de cette formation ✨ Dis-moi « suite » pour la conclure, ou pose-moi tes questions pour appliquer tout ça à ton livre.';
+  if (isLastOfModule) return '— Tu as terminé ce module 🎉 Dis « suite » pour passer au suivant, ou pose-moi tes questions sur cette étape.';
+  return '— Quand tu es prêt·e, dis « suite » pour la prochaine étape 💜 (ou pose-moi tes questions).';
+}
+
+function renderFormationBlocForChat(bloc, ctx) {
+  const type = String((bloc && bloc.type) || 'texte').toLowerCase();
+  const parts = [];
+  if (type === 'intervention' || type === 'texte') {
+    parts.push(String(bloc.contenu || '').trim());
+  } else if (type === 'audio') {
+    if (bloc.intro) parts.push(String(bloc.intro).trim());
+    else if (bloc.titre) parts.push('🎧 ' + String(bloc.titre).trim());
+    if (isHttpsUrl(bloc.url)) parts.push('[AUDIO: ' + String(bloc.url).trim() + ']');
+  } else if (type === 'video' || type === 'vidéo') {
+    if (bloc.intro) parts.push(String(bloc.intro).trim());
+    else if (bloc.titre) parts.push('🎬 ' + String(bloc.titre).trim());
+    if (isHttpsUrl(bloc.url)) parts.push('[VIDEO: ' + String(bloc.url).trim() + ']');
+  } else if (type === 'image') {
+    if (bloc.legende) parts.push(String(bloc.legende).trim());
+    if (isHttpsUrl(bloc.url)) parts.push('[PHOTO: ' + String(bloc.url).trim() + ']');
+  } else if (type === 'exercice') {
+    if (bloc.objectif) parts.push('🎯 ' + String(bloc.objectif).trim());
+    if (bloc.consigne) parts.push(String(bloc.consigne).trim());
+  } else {
+    parts.push(String(bloc.contenu || bloc.url || '').trim());
+  }
+  let body = parts.filter(Boolean).join('\n\n').trim();
+  if (!body) body = '…';
+  const hint = formationNavHint(ctx.isLastOfModule, ctx.isLastOfFormation);
+  if (hint) body += '\n\n' + hint;
+  return body;
+}
+
+async function runFormationControlTurn(env, session, agent, message) {
+  const ctrl = parseFormationControl(message);
+  if (!ctrl.action) return null;
+
+  const formations = await listFormations(env, agent);
+  if (!formations.length) return null; // rien à piloter : on laisse le chat normal répondre
+  const progressAll = await getFormationProgress(env, session.email);
+
+  // Choix de la formation concernée.
+  let formation = resolveActiveFormation(formations, message);
+  if (!formation && (ctrl.action === 'resume' || ctrl.action === 'advance')) {
+    formation = pickLatestProgressFormation(formations, progressAll);
+  }
+  if (!formation) formation = formations[0]; // triées par ordre : la première formation concernée
+  if (!formation) return null;
+
+  const modules = normalizeFormationModules(formation);
+  if (!modules.length) {
+    return { content: `La formation « ${formation.titre} » n'a pas encore de module 💜 Reviens un peu plus tard.` };
+  }
+  const prog = progressAll[formation.id] || null;
+
+  const idxByNumero = (n) => { const i = modules.findIndex(mm => mm.numero === n); return i >= 0 ? i : null; };
+  const idxById = (id) => { const i = modules.findIndex(mm => mm.id === id); return i >= 0 ? i : null; };
+  const savedPosition = () => {
+    if (!prog) return null;
+    let mi = null;
+    if (prog.moduleId) mi = idxById(prog.moduleId);
+    if (mi == null && prog.moduleNumero != null) mi = idxByNumero(prog.moduleNumero);
+    if (mi == null) return null;
+    let bi = Number.isFinite(prog.blocIndex) ? prog.blocIndex : 0;
+    if (bi < 0) bi = 0;
+    const maxBi = Math.max(0, modules[mi].blocs.length - 1);
+    if (bi > maxBi) bi = maxBi;
+    return { mi, bi };
+  };
+
+  let moduleIdx = 0, blocIdx = 0, markCompletedModuleId = null;
+
+  if (ctrl.action === 'module') {
+    const mi = idxByNumero(ctrl.moduleNumero);
+    if (mi == null) {
+      const list = modules.map(mm => `• Module ${mm.numero} — ${mm.titre}`).join('\n');
+      return { content: `Le module ${ctrl.moduleNumero} n'existe pas encore dans « ${formation.titre} » 💜\n\nVoici les modules disponibles :\n${list}\n\nDis-moi lequel tu veux ouvrir.` };
+    }
+    moduleIdx = mi; blocIdx = 0;
+  } else if (ctrl.action === 'restart') {
+    moduleIdx = 0; blocIdx = 0;
+  } else if (ctrl.action === 'start') {
+    // Démarrage : s'il existe déjà une progression, on reprend au lieu de recommencer.
+    const sp = prog ? savedPosition() : null;
+    if (sp) { moduleIdx = sp.mi; blocIdx = sp.bi; } else { moduleIdx = 0; blocIdx = 0; }
+  } else if (ctrl.action === 'resume') {
+    const sp = savedPosition();
+    if (sp) { moduleIdx = sp.mi; blocIdx = sp.bi; } else { moduleIdx = 0; blocIdx = 0; }
+  } else if (ctrl.action === 'advance') {
+    const sp = savedPosition();
+    if (!sp) { moduleIdx = 0; blocIdx = 0; }
+    else {
+      moduleIdx = sp.mi; blocIdx = sp.bi + 1;
+      if (blocIdx > modules[moduleIdx].blocs.length - 1) {
+        markCompletedModuleId = modules[moduleIdx].id;
+        if (moduleIdx + 1 < modules.length) { moduleIdx += 1; blocIdx = 0; }
+        else {
+          await setFormationProgress(env, session.email, formation.id, {
+            moduleId: modules[moduleIdx].id,
+            moduleNumero: modules[moduleIdx].numero,
+            blocIndex: Math.max(0, modules[moduleIdx].blocs.length - 1),
+            completedModuleId: markCompletedModuleId
+          });
+          return { content: `Bravo 🎉 Tu as parcouru toute la formation « ${formation.titre} » !\n\nOn peut maintenant reprendre n'importe quel module ensemble, ou avancer sur ton propre livre. Dis-moi « module X » quand tu veux revoir une étape.` };
+        }
+      }
+    }
+  }
+
+  const module = modules[moduleIdx];
+  if (!module.blocs.length) {
+    const list = modules.map(mm => `• Module ${mm.numero} — ${mm.titre}`).join('\n');
+    return { content: `Le module ${module.numero} n'a pas encore de contenu 💜\n\nModules disponibles :\n${list}` };
+  }
+  if (blocIdx > module.blocs.length - 1) blocIdx = module.blocs.length - 1;
+  const bloc = module.blocs[blocIdx];
+
+  const content = renderFormationBlocForChat(bloc, {
+    isLastOfModule: blocIdx === module.blocs.length - 1,
+    isLastOfFormation: (moduleIdx === modules.length - 1) && (blocIdx === module.blocs.length - 1)
+  });
+
+  // Mémorise la position sur ce bloc précis (permet la reprise fidèle).
+  await setFormationProgress(env, session.email, formation.id, {
+    moduleId: module.id,
+    moduleNumero: module.numero,
+    blocIndex: blocIdx,
+    completedModuleId: markCompletedModuleId
+  });
+
+  // Les marqueurs média sont générés à partir de l'URL exacte du bloc : on les valide par sécurité.
+  const t = String(bloc.type || '').toLowerCase();
+  const u = isHttpsUrl(bloc.url) ? [String(bloc.url).trim()] : [];
+  let safe = sanitizeLivingVideoMarkers(content, (t === 'video' || t === 'vidéo') ? u : []);
+  safe = sanitizeApprovedMediaMarkers(safe, 'AUDIO', t === 'audio' ? u : [], 1);
+  safe = sanitizeApprovedMediaMarkers(safe, 'PHOTO', t === 'image' ? u : [], 1);
+  return { content: safe || content };
+}
+
+async function getSessionFromToken(env, token) {
+  if (!token) return null;
+  try {
+    const raw = await env.CASHFLOW_KV.get(`session:${token}`);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (_) { return null; }
+}
+
+async function handleFormationList(request, env) {
+  const body = await request.json().catch(() => ({}));
+  const session = await getSessionFromToken(env, body.token);
+  if (!session) return json({ error: 'Session expirée. Reconnecte-toi.' }, 401);
+  const agent = (body.agent && typeof body.agent === 'string') ? body.agent : 'eric';
+
+  const formations = await listFormations(env, agent);
+  const progress = await getFormationProgress(env, session.email);
+  const out = formations.map(f => ({
+    id: f.id,
+    titre: f.titre || '',
+    description: f.description || '',
+    modules: normalizeFormationModules(f).map(m => ({
+      id: m.id, numero: m.numero, titre: m.titre, blocsCount: (m.blocs || []).length
+    })),
+    progress: progress[f.id] || null
+  }));
+  return json({ formations: out });
+}
+
+async function handleFormationModule(request, env) {
+  const body = await request.json().catch(() => ({}));
+  const session = await getSessionFromToken(env, body.token);
+  if (!session) return json({ error: 'Session expirée. Reconnecte-toi.' }, 401);
+  const agent = (body.agent && typeof body.agent === 'string') ? body.agent : 'eric';
+
+  const formation = await getFormation(env, agent, body.formationId);
+  if (!formation) return json({ error: 'Formation introuvable.' }, 404);
+  const moduleNumero = Number.isFinite(body.moduleNumero) ? body.moduleNumero
+    : (body.moduleNumero != null ? parseInt(body.moduleNumero, 10) : null);
+  const module = findFormationModule(formation, { moduleId: body.moduleId, moduleNumero });
+  if (!module) return json({ error: 'Module introuvable.' }, 404);
+
+  return json({
+    formation: { id: formation.id, titre: formation.titre || '', description: formation.description || '' },
+    module: { id: module.id, numero: module.numero, titre: module.titre, blocs: module.blocs || [] }
+  });
+}
+
+async function handleFormationProgressRoute(request, env) {
+  const body = await request.json().catch(() => ({}));
+  const session = await getSessionFromToken(env, body.token);
+  if (!session) return json({ error: 'Session expirée. Reconnecte-toi.' }, 401);
+
+  if (body.mode === 'set') {
+    if (!body.formationId) return json({ error: 'formationId requis.' }, 400);
+    const saved = await setFormationProgress(env, session.email, body.formationId, {
+      moduleId: body.moduleId != null ? body.moduleId : null,
+      moduleNumero: Number.isFinite(body.moduleNumero) ? body.moduleNumero : (body.moduleNumero != null ? parseInt(body.moduleNumero, 10) : null),
+      blocIndex: Number.isFinite(body.blocIndex) ? body.blocIndex : (body.blocIndex != null ? parseInt(body.blocIndex, 10) : null),
+      completedModuleId: body.completedModuleId || null
+    });
+    return json({ success: true, progress: saved });
+  }
+
+  const progress = await getFormationProgress(env, session.email);
+  if (body.formationId) return json({ progress: progress[body.formationId] || null });
+  return json({ progress });
+}
+
+// ═══════════ FIN FORMATION VIVANTE ═══════════
+
 async function handleChat(request, env) {
   const { message, history, userName, agent, attachment, token } = await request.json();
 
@@ -299,6 +831,18 @@ async function handleChat(request, env) {
   if (!token) return json({ error: 'Session manquante.' }, 401);
   const sessionRaw = await env.CASHFLOW_KV.get(`session:${token}`);
   if (!sessionRaw) return json({ error: 'Session expirée. Reconnecte-toi.' }, 401);
+  let session;
+  try { session = JSON.parse(sessionRaw); } catch (_) { return json({ error: 'Session invalide.' }, 401); }
+
+  // 🎓 Pilotage déterministe de la Formation Vivante : commence / continue / module X / suite.
+  // Générique : s'active pour le personnage courant s'il possède des formations (formation:{agent}:…).
+  try {
+    const controlled = await runFormationControlTurn(env, session, agent, message || '');
+    if (controlled && controlled.content) {
+      const nom = userName || session.firstname || 'toi';
+      return json({ content: String(controlled.content).replace(/\{first_name\}/g, nom) });
+    }
+  } catch (e) { /* en cas de souci, on retombe sur le chat normal */ }
 
   let systemPrompt = (SYSTEM_PROMPTS[agent] || SYSTEM_PROMPTS.nyxia)
     .replace(/\{first_name\}/g, userName || 'Gardienne');
@@ -317,6 +861,11 @@ async function handleChat(request, env) {
   }
 
   // 📚 CERVEAU VECTORIEL — Éric et NyXia fouillent dans les livres via Cloudflare Vectorize
+  let approvedLivingVideoUrls = [];
+  let approvedLivingAudioUrls = [];
+  let approvedLivingImageUrls = [];
+  let videoProtocolAdded = false;
+  let formationSave = null;
   if (agent) { // universel : tout personnage cherche dans son namespace ; s'il est vide, rien n'est ajouté
     try {
       const brainCtx = await retrieveBrain(env, agent, message || '');
@@ -330,8 +879,58 @@ async function handleChat(request, env) {
         } else {
           systemPrompt += `\n\n📚 EXTRAITS DE TES DOCUMENTS DE RÉFÉRENCE (matière première — appuie-toi dessus fidèlement, reformule dans ton ton, ne cite jamais de numéros de passage) :\n\n${brainCtx}`;
         }
+
+        approvedLivingVideoUrls = extractApprovedLivingVideoUrls(brainCtx);
+        approvedLivingAudioUrls = extractApprovedMediaUrls(brainCtx, 'AUDIO');
+        approvedLivingImageUrls = extractApprovedMediaUrls(brainCtx, 'IMAGE');
+        if (approvedLivingVideoUrls.length) { systemPrompt += LIVING_VIDEO_TRAINING_PROTOCOL; videoProtocolAdded = true; }
+        if (approvedLivingAudioUrls.length) { systemPrompt += LIVING_AUDIO_TRAINING_PROTOCOL; }
       }
     } catch (e) { /* le chat continue même si le cerveau est indisponible */ }
+  }
+
+  // 🎓 FORMATION VIVANTE — catalogue structuré + progression (générique par personnage).
+  if (agent) {
+    try {
+      const formations = await listFormations(env, agent);
+      if (formations.length) {
+        const progressAll = await getFormationProgress(env, session.email);
+        systemPrompt += `\n\n${buildFormationMap(formations, progressAll)}`;
+        systemPrompt += LIVING_TRAINING_PROTOCOL;
+
+        const intent = parseFormationIntent(message || '');
+        const formation = resolveActiveFormation(formations, message || '');
+        if (formation) {
+          const prog = progressAll[formation.id] || null;
+          let targetModule = null;
+          if (intent.moduleNumero != null) {
+            targetModule = findFormationModule(formation, { moduleNumero: intent.moduleNumero });
+          } else if (intent.wantsResume && prog) {
+            targetModule = findFormationModule(formation, { moduleId: prog.moduleId, moduleNumero: prog.moduleNumero });
+          } else if (intent.wantsStart) {
+            targetModule = findFormationModule(formation, { moduleNumero: 1 }) || normalizeFormationModules(formation)[0] || null;
+          } else if (prog && (prog.moduleId || prog.moduleNumero != null)) {
+            targetModule = findFormationModule(formation, { moduleId: prog.moduleId, moduleNumero: prog.moduleNumero });
+          }
+          if (targetModule) {
+            const injection = buildActiveModuleInjection(formation, targetModule);
+            systemPrompt += `\n\n${injection}`;
+            approvedLivingVideoUrls = approvedLivingVideoUrls.concat(extractApprovedLivingVideoUrls(injection));
+            approvedLivingAudioUrls = approvedLivingAudioUrls.concat(extractApprovedMediaUrls(injection, 'AUDIO'));
+            approvedLivingImageUrls = approvedLivingImageUrls.concat(extractApprovedMediaUrls(injection, 'IMAGE'));
+            if (approvedLivingVideoUrls.length && !videoProtocolAdded) { systemPrompt += LIVING_VIDEO_TRAINING_PROTOCOL; videoProtocolAdded = true; }
+            if (intent.isTraining) {
+              formationSave = {
+                formationId: formation.id,
+                moduleId: targetModule.id,
+                moduleNumero: targetModule.numero,
+                completedModuleId: intent.wantsFinishModule ? targetModule.id : null
+              };
+            }
+          }
+        }
+      }
+    } catch (e) { /* le chat continue même si la formation est indisponible */ }
   }
 
   // 👑 RESSOURCES DIANE — Cherche des liens Canva ou B-roll dans le KV
@@ -403,7 +1002,23 @@ async function handleChat(request, env) {
   }
 
   const data = await resp.json();
-  const content = data.choices?.[0]?.message?.content || 'Le miroir est resté silencieux, réessaie 💜';
+  let content = data.choices?.[0]?.message?.content || 'Le miroir est resté silencieux, réessaie 💜';
+
+  content = sanitizeLivingVideoMarkers(content, approvedLivingVideoUrls);
+  content = sanitizeApprovedMediaMarkers(content, 'AUDIO', approvedLivingAudioUrls, 3);
+  content = sanitizeApprovedMediaMarkers(content, 'PHOTO', approvedLivingImageUrls, 3);
+  if (!content) content = 'Petite interruption... réessaie dans un instant 💜';
+
+  if (formationSave && session && session.email) {
+    try {
+      await setFormationProgress(env, session.email, formationSave.formationId, {
+        moduleId: formationSave.moduleId,
+        moduleNumero: formationSave.moduleNumero,
+        completedModuleId: formationSave.completedModuleId
+      });
+    } catch (_) { /* la progression n'est pas bloquante */ }
+  }
+
   return json({ content });
 }
 
